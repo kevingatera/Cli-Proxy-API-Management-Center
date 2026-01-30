@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useNotificationStore } from '@/stores';
 import type { ModelPrice } from '@/utils/usage';
 import styles from '@/pages/UsagePage.module.scss';
 
@@ -15,14 +16,151 @@ export interface PriceSettingsCardProps {
 export function PriceSettingsCard({
   modelNames,
   modelPrices,
-  onPricesChange
+  onPricesChange,
 }: PriceSettingsCardProps) {
   const { t } = useTranslation();
+  const { showNotification } = useNotificationStore();
 
   const [selectedModel, setSelectedModel] = useState('');
   const [promptPrice, setPromptPrice] = useState('');
   const [completionPrice, setCompletionPrice] = useState('');
   const [cachePrice, setCachePrice] = useState('');
+  const [importingOpenRouter, setImportingOpenRouter] = useState(false);
+  const [fetchingOpenRouter, setFetchingOpenRouter] = useState(false);
+
+  const normalizeModelPricesPayload = (payload: unknown): Record<string, ModelPrice> => {
+    const candidate: any =
+      payload &&
+      typeof payload === 'object' &&
+      (payload as any).prices &&
+      typeof (payload as any).prices === 'object'
+        ? (payload as any).prices
+        : payload;
+
+    if (!candidate || typeof candidate !== 'object') {
+      throw new Error('invalid payload');
+    }
+
+    const normalized: Record<string, ModelPrice> = {};
+    for (const [model, price] of Object.entries(candidate as Record<string, any>)) {
+      if (!model || !price || typeof price !== 'object') continue;
+      const prompt = Number((price as any).prompt);
+      const completion = Number((price as any).completion);
+      const cache = (price as any).cache === undefined ? prompt : Number((price as any).cache);
+      normalized[model] = {
+        prompt: Number.isFinite(prompt) && prompt >= 0 ? prompt : 0,
+        completion: Number.isFinite(completion) && completion >= 0 ? completion : 0,
+        cache:
+          Number.isFinite(cache) && cache >= 0
+            ? cache
+            : Number.isFinite(prompt) && prompt >= 0
+              ? prompt
+              : 0,
+      };
+    }
+    return normalized;
+  };
+
+  const mergeAsDefaults = (defaults: Record<string, ModelPrice>) => {
+    const existingKeys = new Set(Object.keys(modelPrices));
+    let added = 0;
+    let kept = 0;
+    for (const key of Object.keys(defaults)) {
+      if (existingKeys.has(key)) kept += 1;
+      else added += 1;
+    }
+    onPricesChange({ ...defaults, ...modelPrices });
+    return { added, kept };
+  };
+
+  const addShortModelAliases = (prices: Record<string, ModelPrice>): Record<string, ModelPrice> => {
+    const merged: Record<string, ModelPrice> = { ...prices };
+    for (const [id, price] of Object.entries(prices)) {
+      const parts = id.split('/').filter(Boolean);
+      if (parts.length < 2) continue;
+      const short = parts[parts.length - 1];
+      if (!short || merged[short]) continue;
+      merged[short] = price;
+    }
+    return merged;
+  };
+
+  const fetchOpenRouterLatestPrices = async (): Promise<Record<string, ModelPrice>> => {
+    const res = await fetch('https://openrouter.ai/api/v1/models', { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const payload: any = await res.json();
+    const models: any[] = Array.isArray(payload?.data) ? payload.data : [];
+    const prices: Record<string, ModelPrice> = {};
+
+    for (const model of models) {
+      const id = typeof model?.id === 'string' ? model.id : '';
+      const pricing = model?.pricing && typeof model.pricing === 'object' ? model.pricing : null;
+      if (!id || !pricing) continue;
+
+      const promptPerToken = Number((pricing as any).prompt);
+      const completionPerToken = Number((pricing as any).completion);
+
+      const prompt = Number.isFinite(promptPerToken) ? Math.max(promptPerToken, 0) * 1_000_000 : 0;
+      const completion = Number.isFinite(completionPerToken)
+        ? Math.max(completionPerToken, 0) * 1_000_000
+        : 0;
+
+      prices[id] = {
+        prompt,
+        completion,
+        cache: prompt,
+      };
+    }
+
+    return addShortModelAliases(prices);
+  };
+
+  const handleImportOpenRouterPrices = async () => {
+    setImportingOpenRouter(true);
+    try {
+      const res = await fetch('/model-prices/openrouter.json', { cache: 'force-cache' });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const payload = await res.json();
+      const normalized = normalizeModelPricesPayload(payload);
+      const { added, kept } = mergeAsDefaults(addShortModelAliases(normalized));
+      showNotification(
+        t('usage_stats.import_openrouter_prices_success', { added, kept }),
+        'success'
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      showNotification(
+        `${t('usage_stats.import_openrouter_prices_failed')}${message ? `: ${message}` : ''}`,
+        'error'
+      );
+    } finally {
+      setImportingOpenRouter(false);
+    }
+  };
+
+  const handleFetchOpenRouterLatestPrices = async () => {
+    setFetchingOpenRouter(true);
+    try {
+      const prices = await fetchOpenRouterLatestPrices();
+      const { added, kept } = mergeAsDefaults(prices);
+      showNotification(
+        t('usage_stats.fetch_openrouter_prices_success', { added, kept }),
+        'success'
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      showNotification(
+        `${t('usage_stats.fetch_openrouter_prices_failed')}${message ? `: ${message}` : ''}`,
+        'error'
+      );
+    } finally {
+      setFetchingOpenRouter(false);
+    }
+  };
 
   const handleSavePrice = () => {
     if (!selectedModel) return;
@@ -68,6 +206,27 @@ export function PriceSettingsCard({
   return (
     <Card title={t('usage_stats.model_price_settings')}>
       <div className={styles.pricingSection}>
+        <div className={styles.pricingActions}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleFetchOpenRouterLatestPrices}
+            loading={fetchingOpenRouter}
+            disabled={fetchingOpenRouter || importingOpenRouter}
+          >
+            {t('usage_stats.fetch_openrouter_prices')}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleImportOpenRouterPrices}
+            loading={importingOpenRouter}
+            disabled={importingOpenRouter || fetchingOpenRouter}
+          >
+            {t('usage_stats.import_openrouter_prices')}
+          </Button>
+        </div>
+
         {/* Price Form */}
         <div className={styles.priceForm}>
           <div className={styles.formRow}>

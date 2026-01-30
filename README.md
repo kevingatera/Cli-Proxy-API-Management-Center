@@ -87,6 +87,13 @@ See `api.md` for the full authentication rules, server-side limits, and edge cas
 - **Logs**: tail logs with incremental polling, auto-refresh, search, hide management traffic, clear logs; download request error log files.
 - **System**: quick links + fetch `/v1/models` (grouped view). Requires at least one proxy API key to query models.
 
+## Model pricing (optional)
+
+- The Usage page can estimate cost when you configure model pricing in **$/1M tokens**.
+- For convenience, the UI includes a button to **fetch latest OpenRouter prices** and apply them as defaults (your existing overrides win).
+- A **vendored OpenRouter pricing snapshot** is also included as a fallback import option.
+- Update the snapshot file: `python3 scripts/update-openrouter-model-prices.py` (writes `public/model-prices/openrouter.json`).
+
 ## Build & release notes
 
 - Vite produces a **single HTML** output (`dist/index.html`) with all assets inlined (via `vite-plugin-singlefile`).

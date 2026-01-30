@@ -108,8 +108,7 @@
   padding: 18px;
   background:
     radial-gradient(120% 140% at 12% 0%, var(--accent-soft) 0%, rgba(0, 0, 0, 0) 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
-    var(--bg-primary);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)), var(--bg-primary);
   border-radius: $radius-lg;
   border: 1px solid var(--border-color);
   display: flex;
@@ -117,7 +116,10 @@
   gap: 10px;
   min-height: 176px;
   box-shadow: var(--shadow-lg);
-  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    border-color $transition-fast;
   overflow: hidden;
 
   &::before {
@@ -428,7 +430,8 @@
   border-collapse: collapse;
   font-size: 12px;
 
-  th, td {
+  th,
+  td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -473,6 +476,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.pricingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .priceForm {

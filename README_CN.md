@@ -87,6 +87,12 @@ npm run build
 - **日志**：增量拉取日志、自动刷新、搜索、隐藏管理端流量、清空日志；下载请求错误日志文件。
 - **系统信息**：快捷链接 + 拉取 `/v1/models` 并分组展示（需要至少一个代理 API Key 才能查询模型）。
 
+## 模型价格（可选）
+
+- “使用统计”页面支持按 **$/1M tokens** 的模型单价估算费用。
+- WebUI 提供按钮用于 **获取最新 OpenRouter 价格** 并作为默认值写入浏览器 `localStorage`（你手动设置/覆盖的价格会优先保留）。
+- 同时内置一份 **OpenRouter 价格快照** 作为兜底导入选项；可通过 `python3 scripts/update-openrouter-model-prices.py` 更新（写入 `public/model-prices/openrouter.json`）。
+
 ## 构建与发布说明
 
 - 使用 Vite 输出 **单文件 HTML**（`dist/index.html`），资源全部内联（`vite-plugin-singlefile`）。
