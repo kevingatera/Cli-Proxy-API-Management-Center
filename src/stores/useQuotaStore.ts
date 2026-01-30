@@ -11,9 +11,15 @@ interface QuotaStoreState {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
+  antigravityQuotaLastUpdatedAt: number | null;
+  codexQuotaLastUpdatedAt: number | null;
+  geminiCliQuotaLastUpdatedAt: number | null;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
+  setAntigravityQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setCodexQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setGeminiCliQuotaLastUpdatedAt: (timestamp: number | null) => void;
   clearQuotaCache: () => void;
 }
 
@@ -28,6 +34,9 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   antigravityQuota: {},
   codexQuota: {},
   geminiCliQuota: {},
+  antigravityQuotaLastUpdatedAt: null,
+  codexQuotaLastUpdatedAt: null,
+  geminiCliQuotaLastUpdatedAt: null,
   setAntigravityQuota: (updater) =>
     set((state) => ({
       antigravityQuota: resolveUpdater(updater, state.antigravityQuota)
@@ -40,10 +49,16 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
     set((state) => ({
       geminiCliQuota: resolveUpdater(updater, state.geminiCliQuota)
     })),
+  setAntigravityQuotaLastUpdatedAt: (timestamp) => set({ antigravityQuotaLastUpdatedAt: timestamp }),
+  setCodexQuotaLastUpdatedAt: (timestamp) => set({ codexQuotaLastUpdatedAt: timestamp }),
+  setGeminiCliQuotaLastUpdatedAt: (timestamp) => set({ geminiCliQuotaLastUpdatedAt: timestamp }),
   clearQuotaCache: () =>
     set({
       antigravityQuota: {},
       codexQuota: {},
-      geminiCliQuota: {}
+      geminiCliQuota: {},
+      antigravityQuotaLastUpdatedAt: null,
+      codexQuotaLastUpdatedAt: null,
+      geminiCliQuotaLastUpdatedAt: null
     })
 }));

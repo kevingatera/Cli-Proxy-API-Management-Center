@@ -29,6 +29,9 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
   const setQuota = useQuotaStore((state) => state[config.storeSetter]) as QuotaSetter<
     Record<string, TState>
   >;
+  const setLastUpdatedAt = useQuotaStore((state) => state[config.storeLastUpdatedAtSetter]) as (
+    timestamp: number | null
+  ) => void;
 
   const loadingRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -84,6 +87,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           });
           return nextState;
         });
+        setLastUpdatedAt(Date.now());
       } finally {
         if (requestId === requestIdRef.current) {
           setLoading(false);
@@ -91,7 +95,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         }
       }
     },
-    [config, setQuota, t]
+    [config, setQuota, setLastUpdatedAt, t]
   );
 
   return { quota, loadQuota };

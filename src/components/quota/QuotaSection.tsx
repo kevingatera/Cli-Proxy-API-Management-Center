@@ -26,6 +26,8 @@ type ViewMode = 'paged' | 'all';
 
 const MAX_ITEMS_PER_PAGE = 14;
 const MAX_SHOW_ALL_THRESHOLD = 30;
+const AUTO_REFRESH_THROTTLE_MS = 20_000;
+const AUTO_REFRESH_STALE_MS = 5 * 60_000;
 
 interface QuotaPaginationState<T> {
   pageSize: number;
@@ -108,11 +110,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const setQuota = useQuotaStore((state) => state[config.storeSetter]) as QuotaSetter<
     Record<string, TState>
   >;
+  const lastUpdatedAt = useQuotaStore(config.storeLastUpdatedAtSelector);
 
   /* Removed useRef */
   const [columns, gridRef] = useGridColumns(380); // Min card width 380px matches SCSS
   const [viewMode, setViewMode] = useState<ViewMode>('paged');
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
+  const [relativeNow, setRelativeNow] = useState(() => Date.now());
 
   const filteredFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [
     files,
@@ -162,12 +166,62 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const { quota, loadQuota } = useQuotaLoader(config);
 
   const pendingQuotaRefreshRef = useRef(false);
+  const lastAutoRefreshAtRef = useRef(0);
   const prevFilesLoadingRef = useRef(loading);
 
   const handleRefresh = useCallback(() => {
     pendingQuotaRefreshRef.current = true;
     void triggerHeaderRefresh();
   }, []);
+
+  const maybeAutoRefresh = useCallback(() => {
+    if (disabled) return;
+    if (loading) return;
+    if (pendingQuotaRefreshRef.current) return;
+    if (document.visibilityState !== 'visible') return;
+    if (sectionLoading) return;
+    if (filteredFiles.length === 0) return;
+
+    const now = Date.now();
+    if (lastAutoRefreshAtRef.current && now - lastAutoRefreshAtRef.current < AUTO_REFRESH_THROTTLE_MS)
+      return;
+    if (lastUpdatedAt && now - lastUpdatedAt < AUTO_REFRESH_STALE_MS) return;
+
+    const scope = effectiveViewMode === 'all' ? 'all' : 'page';
+    const targets = effectiveViewMode === 'all' ? filteredFiles : pageItems;
+    if (targets.length === 0) return;
+
+    lastAutoRefreshAtRef.current = now;
+    loadQuota(targets, scope, setLoading);
+  }, [
+    disabled,
+    effectiveViewMode,
+    filteredFiles,
+    lastUpdatedAt,
+    loadQuota,
+    loading,
+    pageItems,
+    sectionLoading,
+    setLoading
+  ]);
+
+  useEffect(() => {
+    maybeAutoRefresh();
+  }, [maybeAutoRefresh]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      maybeAutoRefresh();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [maybeAutoRefresh]);
 
   useEffect(() => {
     const wasLoading = prevFilesLoadingRef.current;
@@ -201,6 +255,50 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       return nextState;
     });
   }, [filteredFiles, loading, setQuota]);
+
+  useEffect(() => {
+    if (!lastUpdatedAt) return;
+    const interval = window.setInterval(() => setRelativeNow(Date.now()), 15_000);
+    return () => window.clearInterval(interval);
+  }, [lastUpdatedAt]);
+
+  const formatRelativeTime = (timestamp: number, now: number): string => {
+    const diffMs = timestamp - now;
+    const diffSeconds = diffMs / 1000;
+    const absSeconds = Math.abs(diffSeconds);
+
+    let value: number;
+    let unit: Intl.RelativeTimeFormatUnit;
+    if (absSeconds < 60) {
+      value = Math.round(diffSeconds);
+      unit = 'second';
+    } else if (absSeconds < 60 * 60) {
+      value = Math.round(diffSeconds / 60);
+      unit = 'minute';
+    } else if (absSeconds < 60 * 60 * 24) {
+      value = Math.round(diffSeconds / (60 * 60));
+      unit = 'hour';
+    } else {
+      value = Math.round(diffSeconds / (60 * 60 * 24));
+      unit = 'day';
+    }
+
+    try {
+      const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+      return formatter.format(value, unit);
+    } catch {
+      const safeValue = Math.abs(value);
+      const suffix = value < 0 ? 'ago' : '';
+      return `${safeValue} ${unit}${safeValue === 1 ? '' : 's'} ${suffix}`.trim();
+    }
+  };
+
+  const lastUpdatedLabel =
+    filteredFiles.length === 0
+      ? ''
+      : lastUpdatedAt
+        ? t('quota_management.last_updated', { time: formatRelativeTime(lastUpdatedAt, relativeNow) })
+        : t('quota_management.last_updated_never');
 
   const titleNode = (
     <div className={styles.titleWrapper}>
@@ -242,6 +340,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               {t('auth_files.view_mode_all')}
             </Button>
           </div>
+          {lastUpdatedLabel && (
+            <div
+              className={styles.statsInfo}
+              title={lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : undefined}
+            >
+              {lastUpdatedLabel}
+            </div>
+          )}
           <Button
             variant="secondary"
             size="sm"

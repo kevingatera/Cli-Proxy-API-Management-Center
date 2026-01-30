@@ -61,11 +61,21 @@ export interface QuotaStore {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
+  antigravityQuotaLastUpdatedAt: number | null;
+  codexQuotaLastUpdatedAt: number | null;
+  geminiCliQuotaLastUpdatedAt: number | null;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
+  setAntigravityQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setCodexQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setGeminiCliQuotaLastUpdatedAt: (timestamp: number | null) => void;
   clearQuotaCache: () => void;
 }
+
+type LastUpdatedAtSetterKey = {
+  [K in keyof QuotaStore]: QuotaStore[K] extends (timestamp: number | null) => void ? K : never;
+}[keyof QuotaStore];
 
 export interface QuotaConfig<TState, TData> {
   type: QuotaType;
@@ -74,6 +84,8 @@ export interface QuotaConfig<TState, TData> {
   fetchQuota: (file: AuthFileItem, t: TFunction) => Promise<TData>;
   storeSelector: (state: QuotaStore) => Record<string, TState>;
   storeSetter: keyof QuotaStore;
+  storeLastUpdatedAtSelector: (state: QuotaStore) => number | null;
+  storeLastUpdatedAtSetter: LastUpdatedAtSetterKey;
   buildLoadingState: () => TState;
   buildSuccessState: (data: TData) => TState;
   buildErrorState: (message: string, status?: number) => TState;
@@ -537,6 +549,8 @@ export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQ
   fetchQuota: fetchAntigravityQuota,
   storeSelector: (state) => state.antigravityQuota,
   storeSetter: 'setAntigravityQuota',
+  storeLastUpdatedAtSelector: (state) => state.antigravityQuotaLastUpdatedAt,
+  storeLastUpdatedAtSetter: 'setAntigravityQuotaLastUpdatedAt',
   buildLoadingState: () => ({ status: 'loading', groups: [] }),
   buildSuccessState: (groups) => ({ status: 'success', groups }),
   buildErrorState: (message, status) => ({
@@ -562,6 +576,8 @@ export const CODEX_CONFIG: QuotaConfig<
   fetchQuota: fetchCodexQuota,
   storeSelector: (state) => state.codexQuota,
   storeSetter: 'setCodexQuota',
+  storeLastUpdatedAtSelector: (state) => state.codexQuotaLastUpdatedAt,
+  storeLastUpdatedAtSetter: 'setCodexQuotaLastUpdatedAt',
   buildLoadingState: () => ({ status: 'loading', windows: [] }),
   buildSuccessState: (data) => ({
     status: 'success',
@@ -588,6 +604,8 @@ export const GEMINI_CLI_CONFIG: QuotaConfig<GeminiCliQuotaState, GeminiCliQuotaB
   fetchQuota: fetchGeminiCliQuota,
   storeSelector: (state) => state.geminiCliQuota,
   storeSetter: 'setGeminiCliQuota',
+  storeLastUpdatedAtSelector: (state) => state.geminiCliQuotaLastUpdatedAt,
+  storeLastUpdatedAtSetter: 'setGeminiCliQuotaLastUpdatedAt',
   buildLoadingState: () => ({ status: 'loading', buckets: [] }),
   buildSuccessState: (buckets) => ({ status: 'success', buckets }),
   buildErrorState: (message, status) => ({

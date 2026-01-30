@@ -790,7 +790,9 @@
     "title": "配额管理",
     "description": "集中查看 OAuth 额度与剩余情况",
     "refresh_files": "刷新认证文件",
-    "refresh_files_and_quota": "刷新认证文件&额度"
+    "refresh_files_and_quota": "刷新认证文件&额度",
+    "last_updated": "上次更新：{{time}}",
+    "last_updated_never": "上次更新：从未"
   },
   "system_info": {
     "title": "管理中心信息",
