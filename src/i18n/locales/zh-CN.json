@@ -792,7 +792,10 @@
     "refresh_files": "刷新认证文件",
     "refresh_files_and_quota": "刷新认证文件&额度",
     "last_updated": "上次更新：{{time}}",
-    "last_updated_never": "上次更新：从未"
+    "last_updated_never": "上次更新：从未",
+    "station_keeping_label": "配额保活",
+    "station_keeping_hint": "自动刷新配额状态以捕捉周期性重置。",
+    "station_keeping_toggle_label": "切换配额保活"
   },
   "system_info": {
     "title": "管理中心信息",

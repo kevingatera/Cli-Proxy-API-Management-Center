@@ -28,6 +28,7 @@ const MAX_ITEMS_PER_PAGE = 14;
 const MAX_SHOW_ALL_THRESHOLD = 30;
 const AUTO_REFRESH_THROTTLE_MS = 20_000;
 const AUTO_REFRESH_STALE_MS = 5 * 60_000;
+const STATION_KEEPING_INTERVAL_MS = 60_000;
 
 interface QuotaPaginationState<T> {
   pageSize: number;
@@ -97,13 +98,15 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   files: AuthFileItem[];
   loading: boolean;
   disabled: boolean;
+  stationKeepingEnabled: boolean;
 }
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
   config,
   files,
   loading,
-  disabled
+  disabled,
+  stationKeepingEnabled
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -222,6 +225,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       window.removeEventListener('focus', handleVisibility);
     };
   }, [maybeAutoRefresh]);
+
+  useEffect(() => {
+    if (!stationKeepingEnabled) return;
+    const interval = window.setInterval(() => {
+      maybeAutoRefresh();
+    }, STATION_KEEPING_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [maybeAutoRefresh, stationKeepingEnabled]);
 
   useEffect(() => {
     const wasLoading = prevFilesLoadingRef.current;

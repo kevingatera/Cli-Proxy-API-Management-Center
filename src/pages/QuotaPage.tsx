@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useQuotaStationKeepingStore } from '@/stores';
 import { authFilesApi, configFileApi } from '@/services/api';
 import {
   QuotaSection,
@@ -13,12 +13,15 @@ import {
   CODEX_CONFIG,
   GEMINI_CLI_CONFIG
 } from '@/components/quota';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
 export function QuotaPage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const stationKeepingEnabled = useQuotaStationKeepingStore((state) => state.enabled);
+  const setStationKeepingEnabled = useQuotaStationKeepingStore((state) => state.setEnabled);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +68,17 @@ export function QuotaPage() {
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>{t('quota_management.title')}</h1>
         <p className={styles.description}>{t('quota_management.description')}</p>
+        <div className={styles.stationKeepingRow}>
+          <ToggleSwitch
+            checked={stationKeepingEnabled}
+            onChange={setStationKeepingEnabled}
+            ariaLabel={t('quota_management.station_keeping_toggle_label')}
+            label={t('quota_management.station_keeping_label')}
+          />
+          <span className={styles.stationKeepingHint}>
+            {t('quota_management.station_keeping_hint')}
+          </span>
+        </div>
       </div>
 
       {error && <div className={styles.errorBox}>{error}</div>}
@@ -74,18 +88,21 @@ export function QuotaPage() {
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={CODEX_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={GEMINI_CLI_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
     </div>
   );

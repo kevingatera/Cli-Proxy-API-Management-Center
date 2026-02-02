@@ -32,6 +32,7 @@ export const STORAGE_KEY_THEME = 'cli-proxy-theme';
 export const STORAGE_KEY_LANGUAGE = 'cli-proxy-language';
 export const STORAGE_KEY_SIDEBAR = 'cli-proxy-sidebar-collapsed';
 export const STORAGE_KEY_AUTH_FILES_PAGE_SIZE = 'cli-proxy-auth-files-page-size';
+export const STORAGE_KEY_QUOTA_STATION_KEEPING = 'cli-proxy-quota-station-keeping';
 
 // 通知持续时间
 export const NOTIFICATION_DURATION_MS = 3000;
