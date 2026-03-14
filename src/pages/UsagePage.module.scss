@@ -484,6 +484,17 @@
   gap: 8px;
 }
 
+.pricingHintBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pricingHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .priceForm {
   padding: 10px;
   background-color: var(--bg-secondary);

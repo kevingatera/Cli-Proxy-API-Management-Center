@@ -3,6 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '@/stores';
 import { usageApi } from '@/services/api/usage';
 import { loadModelPrices, saveModelPrices, type ModelPrice } from '@/utils/usage';
+import {
+  OPENROUTER_REMOTE_SYNC_INTERVAL_MS,
+  fetchBundledOpenRouterPrices,
+  fetchOpenRouterLatestPrices,
+  getUsedModelNames,
+  loadLastOpenRouterRemoteSyncAt,
+  mergeModelPricesForUsedModels,
+  saveLastOpenRouterRemoteSyncAt,
+} from '@/utils/modelPrices';
 
 export interface UsagePayload {
   total_requests?: number;
@@ -39,6 +48,9 @@ export function useUsageData(): UseUsageDataReturn {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const syncingPricesRef = useRef(false);
+  const lastAutoSyncSignatureRef = useRef('');
+  const lastAutoSyncAtRef = useRef(0);
 
   const loadUsage = useCallback(async () => {
     setLoading(true);
@@ -135,6 +147,87 @@ export function useUsageData(): UseUsageDataReturn {
     setModelPrices(prices);
     saveModelPrices(prices);
   }, []);
+
+  useEffect(() => {
+    if (!usage || syncingPricesRef.current) {
+      return;
+    }
+
+    const activeModelNames = getUsedModelNames(usage);
+    if (!activeModelNames.length) {
+      return;
+    }
+
+    const signature = activeModelNames.join('|');
+    const retained = mergeModelPricesForUsedModels(modelPrices, {}, activeModelNames).nextPrices;
+    const retainedKeys = Object.keys(retained);
+    const currentKeys = Object.keys(modelPrices);
+    if (
+      retainedKeys.length !== currentKeys.length ||
+      retainedKeys.some((key) => !Object.prototype.hasOwnProperty.call(modelPrices, key))
+    ) {
+      handleSetModelPrices(retained);
+      return;
+    }
+
+    const missingModels = activeModelNames.filter(
+      (name: string) => !Object.prototype.hasOwnProperty.call(modelPrices, name)
+    );
+    if (!missingModels.length) {
+      lastAutoSyncSignatureRef.current = signature;
+      return;
+    }
+    if (lastAutoSyncSignatureRef.current === signature && Date.now() - lastAutoSyncAtRef.current < 30_000) {
+      return;
+    }
+
+    syncingPricesRef.current = true;
+    lastAutoSyncSignatureRef.current = signature;
+    lastAutoSyncAtRef.current = Date.now();
+
+    void (async () => {
+      let nextPrices = { ...modelPrices };
+      let remainingMissing = [...missingModels];
+
+      try {
+        const bundled = await fetchBundledOpenRouterPrices();
+        const mergedBundled = mergeModelPricesForUsedModels(nextPrices, bundled, activeModelNames);
+        nextPrices = mergedBundled.nextPrices;
+        remainingMissing = mergedBundled.missingModels;
+        if (mergedBundled.added > 0) {
+          handleSetModelPrices(nextPrices);
+        }
+      } catch {
+        // Ignore local catalog errors and fall through to remote sync when needed.
+      }
+
+      if (remainingMissing.length) {
+        const lastRemoteSync = loadLastOpenRouterRemoteSyncAt();
+        if (Date.now() - lastRemoteSync >= OPENROUTER_REMOTE_SYNC_INTERVAL_MS) {
+          try {
+            const remote = await fetchOpenRouterLatestPrices();
+            const mergedRemote = mergeModelPricesForUsedModels(nextPrices, remote, activeModelNames);
+            nextPrices = mergedRemote.nextPrices;
+            remainingMissing = mergedRemote.missingModels;
+            saveLastOpenRouterRemoteSyncAt(Date.now());
+            if (mergedRemote.added > 0) {
+              handleSetModelPrices(nextPrices);
+            }
+          } catch {
+            // Keep current prices if remote sync fails.
+          }
+        }
+      }
+
+      try {
+        if (!remainingMissing.length) {
+          lastAutoSyncSignatureRef.current = activeModelNames.join('|');
+        }
+      } finally {
+        syncingPricesRef.current = false;
+      }
+    })();
+  }, [handleSetModelPrices, modelPrices, usage]);
 
   return {
     usage,

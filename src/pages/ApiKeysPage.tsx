@@ -8,6 +8,14 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { apiKeysApi } from '@/services/api';
+import {
+  getApiKeyDisplayLabel,
+  getCustomApiKeyLabel,
+  loadApiKeyLabels,
+  removeCustomApiKeyLabel,
+  saveApiKeyLabels,
+  setCustomApiKeyLabel,
+} from '@/utils/apiKeyNames';
 import { maskApiKey } from '@/utils/format';
 import { isValidApiKeyCharset } from '@/utils/validation';
 import styles from './ApiKeysPage.module.scss';
@@ -23,14 +31,21 @@ export function ApiKeysPage() {
   const clearCache = useConfigStore((state) => state.clearCache);
 
   const [apiKeys, setApiKeys] = useState<string[]>([]);
+  const [apiKeyLabels, setApiKeyLabels] = useState<Record<string, string>>(() => loadApiKeyLabels());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
+  const [labelValue, setLabelValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   const disableControls = useMemo(() => connectionStatus !== 'connected', [connectionStatus]);
+
+  const persistLabels = useCallback((nextLabels: Record<string, string>) => {
+    setApiKeyLabels(nextLabels);
+    saveApiKeyLabels(nextLabels);
+  }, []);
 
   const loadApiKeys = useCallback(
     async (force = false) => {
@@ -38,10 +53,9 @@ export function ApiKeysPage() {
       setError('');
       try {
         const result = (await fetchConfig('api-keys', force)) as string[] | undefined;
-        const list = Array.isArray(result) ? result : [];
-        setApiKeys(list);
-      } catch (err: any) {
-        setError(err?.message || t('notification.refresh_failed'));
+        setApiKeys(Array.isArray(result) ? result : []);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : t('notification.refresh_failed'));
       } finally {
         setLoading(false);
       }
@@ -50,7 +64,7 @@ export function ApiKeysPage() {
   );
 
   useEffect(() => {
-    loadApiKeys();
+    void loadApiKeys();
   }, [loadApiKeys]);
 
   useEffect(() => {
@@ -62,18 +76,22 @@ export function ApiKeysPage() {
   const openAddModal = () => {
     setEditingIndex(null);
     setInputValue('');
+    setLabelValue('');
     setModalOpen(true);
   };
 
   const openEditModal = (index: number) => {
+    const key = apiKeys[index] ?? '';
     setEditingIndex(index);
-    setInputValue(apiKeys[index] ?? '');
+    setInputValue(key);
+    setLabelValue(getCustomApiKeyLabel(key, apiKeyLabels));
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setInputValue('');
+    setLabelValue('');
     setEditingIndex(null);
   };
 
@@ -89,6 +107,7 @@ export function ApiKeysPage() {
     }
 
     const isEdit = editingIndex !== null;
+    const previousKey = isEdit && editingIndex !== null ? apiKeys[editingIndex] ?? '' : '';
     const nextKeys = isEdit
       ? apiKeys.map((key, idx) => (idx === editingIndex ? trimmed : key))
       : [...apiKeys, trimmed];
@@ -103,12 +122,17 @@ export function ApiKeysPage() {
         showNotification(t('notification.api_key_added'), 'success');
       }
 
+      let nextLabels = previousKey ? removeCustomApiKeyLabel(apiKeyLabels, previousKey) : { ...apiKeyLabels };
+      nextLabels = setCustomApiKeyLabel(nextLabels, trimmed, labelValue);
+
       setApiKeys(nextKeys);
+      persistLabels(nextLabels);
       updateConfigValue('api-keys', nextKeys);
       clearCache('api-keys');
       closeModal();
-    } catch (err: any) {
-      showNotification(`${t('notification.update_failed')}: ${err?.message || ''}`, 'error');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      showNotification(`${t('notification.update_failed')}: ${message}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -142,19 +166,21 @@ export function ApiKeysPage() {
           await apiKeysApi.delete(deleteIndex);
           const nextKeys = currentKeys.filter((_, idx) => idx !== deleteIndex);
           setApiKeys(nextKeys);
+          persistLabels(removeCustomApiKeyLabel(apiKeyLabels, apiKeyToDelete));
           updateConfigValue('api-keys', nextKeys);
           clearCache('api-keys');
           showNotification(t('notification.api_key_deleted'), 'success');
-        } catch (err: any) {
-          showNotification(`${t('notification.delete_failed')}: ${err?.message || ''}`, 'error');
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '';
+          showNotification(`${t('notification.delete_failed')}: ${message}`, 'error');
         }
-      }
+      },
     });
   };
 
   const actionButtons = (
     <div style={{ display: 'flex', gap: 8 }}>
-      <Button variant="secondary" size="sm" onClick={() => loadApiKeys(true)} disabled={loading}>
+      <Button variant="secondary" size="sm" onClick={() => void loadApiKeys(true)} disabled={loading}>
         {t('common.refresh')}
       </Button>
       <Button size="sm" onClick={openAddModal} disabled={disableControls}>
@@ -186,28 +212,34 @@ export function ApiKeysPage() {
           />
         ) : (
           <div className="item-list">
-            {apiKeys.map((key, index) => (
-              <div key={index} className="item-row">
-                <div className="item-meta">
-                  <div className="pill">#{index + 1}</div>
-                  <div className="item-title">{t('api_keys.item_title')}</div>
-                  <div className="item-subtitle">{maskApiKey(String(key || ''))}</div>
+            {apiKeys.map((key, index) => {
+              const hasCustomLabel = !!getCustomApiKeyLabel(key, apiKeyLabels);
+              return (
+                <div key={index} className="item-row">
+                  <div className="item-meta">
+                    <div className="pill">#{index + 1}</div>
+                    <div className="item-title">{getApiKeyDisplayLabel(key, apiKeyLabels)}</div>
+                    <div className="item-subtitle">{maskApiKey(String(key || ''))}</div>
+                    {!hasCustomLabel && (
+                      <div className={styles.generatedHint}>{t('api_keys.generated_name_hint')}</div>
+                    )}
+                  </div>
+                  <div className="item-actions">
+                    <Button variant="secondary" size="sm" onClick={() => openEditModal(index)} disabled={disableControls}>
+                      {t('common.edit')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDelete(index)}
+                      disabled={disableControls}
+                    >
+                      {t('common.delete')}
+                    </Button>
+                  </div>
                 </div>
-                <div className="item-actions">
-                  <Button variant="secondary" size="sm" onClick={() => openEditModal(index)} disabled={disableControls}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleDelete(index)}
-                    disabled={disableControls}
-                  >
-                    {t('common.delete')}
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -227,14 +259,16 @@ export function ApiKeysPage() {
           }
         >
           <Input
-            label={
-              editingIndex !== null ? t('api_keys.edit_modal_key_label') : t('api_keys.add_modal_key_label')
-            }
-            placeholder={
-              editingIndex !== null
-                ? t('api_keys.edit_modal_key_label')
-                : t('api_keys.add_modal_key_placeholder')
-            }
+            label={t('api_keys.name_label')}
+            placeholder={t('api_keys.name_placeholder')}
+            value={labelValue}
+            onChange={(e) => setLabelValue(e.target.value)}
+            disabled={saving}
+            hint={t('api_keys.name_hint')}
+          />
+          <Input
+            label={editingIndex !== null ? t('api_keys.edit_modal_key_label') : t('api_keys.add_modal_key_label')}
+            placeholder={editingIndex !== null ? t('api_keys.edit_modal_key_label') : t('api_keys.add_modal_key_placeholder')}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={saving}

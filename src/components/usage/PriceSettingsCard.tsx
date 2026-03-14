@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useNotificationStore } from '@/stores';
 import type { ModelPrice } from '@/utils/usage';
+import {
+  fetchBundledOpenRouterPrices,
+  fetchOpenRouterLatestPrices,
+  keepOnlyUsedModelPrices,
+  mergeModelPricesForUsedModels,
+} from '@/utils/modelPrices';
 import styles from '@/pages/UsagePage.module.scss';
 
 export interface PriceSettingsCardProps {
@@ -28,137 +34,53 @@ export function PriceSettingsCard({
   const [importingOpenRouter, setImportingOpenRouter] = useState(false);
   const [fetchingOpenRouter, setFetchingOpenRouter] = useState(false);
 
-  const normalizeModelPricesPayload = (payload: unknown): Record<string, ModelPrice> => {
-    const candidate: any =
-      payload &&
-      typeof payload === 'object' &&
-      (payload as any).prices &&
-      typeof (payload as any).prices === 'object'
-        ? (payload as any).prices
-        : payload;
+  const activeModelPrices = useMemo(
+    () => keepOnlyUsedModelPrices(modelPrices, modelNames),
+    [modelNames, modelPrices]
+  );
+  const hiddenPriceCount = Math.max(Object.keys(modelPrices).length - Object.keys(activeModelPrices).length, 0);
 
-    if (!candidate || typeof candidate !== 'object') {
-      throw new Error('invalid payload');
+  const applyCatalogPrices = async (
+    loader: () => Promise<Record<string, ModelPrice>>,
+    mode: 'fetch' | 'import'
+  ) => {
+    if (!modelNames.length) {
+      showNotification(t('usage_stats.model_price_no_usage_models'), 'warning');
+      return;
     }
 
-    const normalized: Record<string, ModelPrice> = {};
-    for (const [model, price] of Object.entries(candidate as Record<string, any>)) {
-      if (!model || !price || typeof price !== 'object') continue;
-      const prompt = Number((price as any).prompt);
-      const completion = Number((price as any).completion);
-      const cache = (price as any).cache === undefined ? prompt : Number((price as any).cache);
-      normalized[model] = {
-        prompt: Number.isFinite(prompt) && prompt >= 0 ? prompt : 0,
-        completion: Number.isFinite(completion) && completion >= 0 ? completion : 0,
-        cache:
-          Number.isFinite(cache) && cache >= 0
-            ? cache
-            : Number.isFinite(prompt) && prompt >= 0
-              ? prompt
-              : 0,
-      };
-    }
-    return normalized;
-  };
+    const setLoading = mode === 'fetch' ? setFetchingOpenRouter : setImportingOpenRouter;
+    const successKey =
+      mode === 'fetch'
+        ? 'usage_stats.fetch_openrouter_prices_success'
+        : 'usage_stats.import_openrouter_prices_success';
+    const failedKey =
+      mode === 'fetch'
+        ? 'usage_stats.fetch_openrouter_prices_failed'
+        : 'usage_stats.import_openrouter_prices_failed';
 
-  const mergeAsDefaults = (defaults: Record<string, ModelPrice>) => {
-    const existingKeys = new Set(Object.keys(modelPrices));
-    let added = 0;
-    let kept = 0;
-    for (const key of Object.keys(defaults)) {
-      if (existingKeys.has(key)) kept += 1;
-      else added += 1;
-    }
-    onPricesChange({ ...defaults, ...modelPrices });
-    return { added, kept };
-  };
-
-  const addShortModelAliases = (prices: Record<string, ModelPrice>): Record<string, ModelPrice> => {
-    const merged: Record<string, ModelPrice> = { ...prices };
-    for (const [id, price] of Object.entries(prices)) {
-      const parts = id.split('/').filter(Boolean);
-      if (parts.length < 2) continue;
-      const short = parts[parts.length - 1];
-      if (!short || merged[short]) continue;
-      merged[short] = price;
-    }
-    return merged;
-  };
-
-  const fetchOpenRouterLatestPrices = async (): Promise<Record<string, ModelPrice>> => {
-    const res = await fetch('https://openrouter.ai/api/v1/models', { cache: 'no-store' });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const payload: any = await res.json();
-    const models: any[] = Array.isArray(payload?.data) ? payload.data : [];
-    const prices: Record<string, ModelPrice> = {};
-
-    for (const model of models) {
-      const id = typeof model?.id === 'string' ? model.id : '';
-      const pricing = model?.pricing && typeof model.pricing === 'object' ? model.pricing : null;
-      if (!id || !pricing) continue;
-
-      const promptPerToken = Number((pricing as any).prompt);
-      const completionPerToken = Number((pricing as any).completion);
-
-      const prompt = Number.isFinite(promptPerToken) ? Math.max(promptPerToken, 0) * 1_000_000 : 0;
-      const completion = Number.isFinite(completionPerToken)
-        ? Math.max(completionPerToken, 0) * 1_000_000
-        : 0;
-
-      prices[id] = {
-        prompt,
-        completion,
-        cache: prompt,
-      };
-    }
-
-    return addShortModelAliases(prices);
-  };
-
-  const handleImportOpenRouterPrices = async () => {
-    setImportingOpenRouter(true);
+    setLoading(true);
     try {
-      const res = await fetch('/model-prices/openrouter.json', { cache: 'force-cache' });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const payload = await res.json();
-      const normalized = normalizeModelPricesPayload(payload);
-      const { added, kept } = mergeAsDefaults(addShortModelAliases(normalized));
+      const catalog = await loader();
+      const { nextPrices, added, kept, missingModels } = mergeModelPricesForUsedModels(
+        modelPrices,
+        catalog,
+        modelNames
+      );
+      onPricesChange(nextPrices);
       showNotification(
-        t('usage_stats.import_openrouter_prices_success', { added, kept }),
+        t(successKey, {
+          added,
+          kept,
+          missing: missingModels.length,
+        }),
         'success'
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
-      showNotification(
-        `${t('usage_stats.import_openrouter_prices_failed')}${message ? `: ${message}` : ''}`,
-        'error'
-      );
+      showNotification(`${t(failedKey)}${message ? `: ${message}` : ''}`, 'error');
     } finally {
-      setImportingOpenRouter(false);
-    }
-  };
-
-  const handleFetchOpenRouterLatestPrices = async () => {
-    setFetchingOpenRouter(true);
-    try {
-      const prices = await fetchOpenRouterLatestPrices();
-      const { added, kept } = mergeAsDefaults(prices);
-      showNotification(
-        t('usage_stats.fetch_openrouter_prices_success', { added, kept }),
-        'success'
-      );
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
-      showNotification(
-        `${t('usage_stats.fetch_openrouter_prices_failed')}${message ? `: ${message}` : ''}`,
-        'error'
-      );
-    } finally {
-      setFetchingOpenRouter(false);
+      setLoading(false);
     }
   };
 
@@ -167,8 +89,7 @@ export function PriceSettingsCard({
     const prompt = parseFloat(promptPrice) || 0;
     const completion = parseFloat(completionPrice) || 0;
     const cache = cachePrice.trim() === '' ? prompt : parseFloat(cachePrice) || 0;
-    const newPrices = { ...modelPrices, [selectedModel]: { prompt, completion, cache } };
-    onPricesChange(newPrices);
+    onPricesChange({ ...activeModelPrices, [selectedModel]: { prompt, completion, cache } });
     setSelectedModel('');
     setPromptPrice('');
     setCompletionPrice('');
@@ -176,13 +97,13 @@ export function PriceSettingsCard({
   };
 
   const handleDeletePrice = (model: string) => {
-    const newPrices = { ...modelPrices };
-    delete newPrices[model];
-    onPricesChange(newPrices);
+    const nextPrices = { ...activeModelPrices };
+    delete nextPrices[model];
+    onPricesChange(nextPrices);
   };
 
   const handleEditPrice = (model: string) => {
-    const price = modelPrices[model];
+    const price = activeModelPrices[model];
     setSelectedModel(model);
     setPromptPrice(price?.prompt?.toString() || '');
     setCompletionPrice(price?.completion?.toString() || '');
@@ -191,16 +112,16 @@ export function PriceSettingsCard({
 
   const handleModelSelect = (value: string) => {
     setSelectedModel(value);
-    const price = modelPrices[value];
+    const price = activeModelPrices[value];
     if (price) {
       setPromptPrice(price.prompt.toString());
       setCompletionPrice(price.completion.toString());
       setCachePrice(price.cache.toString());
-    } else {
-      setPromptPrice('');
-      setCompletionPrice('');
-      setCachePrice('');
+      return;
     }
+    setPromptPrice('');
+    setCompletionPrice('');
+    setCachePrice('');
   };
 
   return (
@@ -210,7 +131,7 @@ export function PriceSettingsCard({
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleFetchOpenRouterLatestPrices}
+            onClick={() => void applyCatalogPrices(fetchOpenRouterLatestPrices, 'fetch')}
             loading={fetchingOpenRouter}
             disabled={fetchingOpenRouter || importingOpenRouter}
           >
@@ -219,7 +140,7 @@ export function PriceSettingsCard({
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleImportOpenRouterPrices}
+            onClick={() => void applyCatalogPrices(fetchBundledOpenRouterPrices, 'import')}
             loading={importingOpenRouter}
             disabled={importingOpenRouter || fetchingOpenRouter}
           >
@@ -227,7 +148,13 @@ export function PriceSettingsCard({
           </Button>
         </div>
 
-        {/* Price Form */}
+        <div className={styles.pricingHintBlock}>
+          <div className={styles.pricingHint}>{t('usage_stats.pricing_scope_hint')}</div>
+          {hiddenPriceCount > 0 && (
+            <div className={styles.pricingHint}>{t('usage_stats.pricing_hidden_unused', { count: hiddenPriceCount })}</div>
+          )}
+        </div>
+
         <div className={styles.priceForm}>
           <div className={styles.formRow}>
             <div className={styles.formField}>
@@ -281,25 +208,18 @@ export function PriceSettingsCard({
           </div>
         </div>
 
-        {/* Saved Prices List */}
         <div className={styles.pricesList}>
           <h4 className={styles.pricesTitle}>{t('usage_stats.saved_prices')}</h4>
-          {Object.keys(modelPrices).length > 0 ? (
+          {Object.keys(activeModelPrices).length > 0 ? (
             <div className={styles.pricesGrid}>
-              {Object.entries(modelPrices).map(([model, price]) => (
+              {(Object.entries(activeModelPrices) as Array<[string, ModelPrice]>).map(([model, price]) => (
                 <div key={model} className={styles.priceItem}>
                   <div className={styles.priceInfo}>
                     <span className={styles.priceModel}>{model}</span>
                     <div className={styles.priceMeta}>
-                      <span>
-                        {t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M
-                      </span>
-                      <span>
-                        {t('usage_stats.model_price_completion')}: ${price.completion.toFixed(4)}/1M
-                      </span>
-                      <span>
-                        {t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M
-                      </span>
+                      <span>{t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M</span>
+                      <span>{t('usage_stats.model_price_completion')}: ${price.completion.toFixed(4)}/1M</span>
+                      <span>{t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M</span>
                     </div>
                   </div>
                   <div className={styles.priceActions}>
