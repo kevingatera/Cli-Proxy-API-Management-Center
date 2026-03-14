@@ -9,6 +9,23 @@ import type { OAuthModelAliasEntry } from '@/types';
 type StatusError = { status?: number };
 type AuthFileStatusResponse = { status: string; disabled: boolean };
 
+const RESERVED_AUTH_FILE_NAMES = new Set(['usage_stats.json']);
+
+const filterReservedAuthFiles = (payload: AuthFilesResponse | null | undefined): AuthFilesResponse => {
+  const files = Array.isArray(payload?.files)
+    ? payload.files.filter((file) => {
+        const name = String(file?.name ?? '').trim().toLowerCase();
+        return !RESERVED_AUTH_FILE_NAMES.has(name);
+      })
+    : [];
+
+  return {
+    ...(payload || {}),
+    files,
+    total: typeof payload?.total === 'number' ? Math.min(payload.total, files.length) : files.length
+  };
+};
+
 const getStatusCode = (err: unknown): number | undefined => {
   if (!err || typeof err !== 'object') return undefined;
   if ('status' in err) return (err as StatusError).status;
@@ -103,7 +120,7 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
 const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 
 export const authFilesApi = {
-  list: () => apiClient.get<AuthFilesResponse>('/auth-files'),
+  list: async () => filterReservedAuthFiles(await apiClient.get<AuthFilesResponse>('/auth-files')),
 
   setStatus: (name: string, disabled: boolean) =>
     apiClient.patch<AuthFileStatusResponse>('/auth-files/status', { name, disabled }),
