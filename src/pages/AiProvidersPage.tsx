@@ -534,8 +534,13 @@ export function AiProvidersPage() {
   const openaiModalIndex = modal?.type === 'openai' ? modal.index : null;
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('ai_providers.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('ai_providers.title')}</h1>
+          <p className="page-description">{t('ai_providers.description')}</p>
+        </div>
+      </div>
       <div className={styles.content}>
         {error && <div className="error-box">{error}</div>}
 

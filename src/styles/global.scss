@@ -15,6 +15,10 @@ body {
   transition: background-color $transition-normal, color $transition-normal;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 html.modal-open,
 body.modal-open {
   overflow: hidden;
@@ -57,6 +61,51 @@ body.modal-open .content {
 
 .text-ellipsis {
   @include text-ellipsis;
+}
+
+.page-shell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xl;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: $spacing-lg;
+  flex-wrap: wrap;
+}
+
+.page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-width: 0;
+  max-width: 72ch;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.page-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-sm;
 }
 
 // 通用过渡

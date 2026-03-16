@@ -228,8 +228,13 @@ export function ApiKeysPage() {
   );
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('api_keys.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('api_keys.title')}</h1>
+          <p className="page-description">{t('api_keys.description')}</p>
+        </div>
+      </div>
 
       <Card title={t('api_keys.proxy_auth_title')} extra={actionButtons}>
         {error && <div className="error-box">{error}</div>}

@@ -156,6 +156,7 @@
   },
   "api_keys": {
     "title": "API 密钥管理",
+    "description": "统一管理代理鉴权密钥，以及供所有运维人员共享识别的显示名称。",
     "proxy_auth_title": "代理服务认证密钥",
     "add_button": "添加密钥",
     "empty_title": "暂无API密钥",
@@ -174,6 +175,7 @@
   },
   "ai_providers": {
     "title": "AI 提供商配置",
+    "description": "集中查看上游提供商凭据、路由细节与各类 provider 专属控制项。",
     "gemini_title": "Gemini API 密钥",
     "gemini_add_button": "添加密钥",
     "gemini_empty_title": "暂无Gemini密钥",
@@ -651,6 +653,7 @@
   },
   "usage_stats": {
     "title": "使用统计",
+    "description": "在统一视图中跟踪请求量、Token 使用、缓存命中读取和花费估算。",
     "total_requests": "总请求数",
     "success_requests": "成功请求",
     "failed_requests": "失败请求",
@@ -812,6 +815,7 @@
   },
   "system_info": {
     "title": "管理中心信息",
+    "description": "检查当前代理实例的连接状态、可用模型、冒烟测试和管理面板资源。",
     "connection_status_title": "连接状态",
     "api_status_label": "API 状态:",
     "config_status_label": "配置状态:",

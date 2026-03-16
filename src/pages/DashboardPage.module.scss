@@ -5,26 +5,10 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-lg;
-  max-width: 1000px;
-  margin: 0 auto;
 }
 
 .header {
-  margin-bottom: $spacing-sm;
-}
-
-.title {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.subtitle {
-  font-size: 15px;
-  color: var(--text-secondary);
-  margin: $spacing-xs 0 0 0;
+  margin-bottom: 0;
 }
 
 .connectionCard {

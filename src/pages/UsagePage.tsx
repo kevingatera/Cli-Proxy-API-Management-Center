@@ -98,7 +98,7 @@ export function UsagePage() {
   const hasPrices = Object.keys(modelPrices).length > 0;
 
   return (
-    <div className={styles.container}>
+    <div className={`page-shell ${styles.container}`}>
       {loading && !usage && (
         <div className={styles.loadingOverlay} aria-busy="true">
           <div className={styles.loadingOverlayContent}>
@@ -108,9 +108,12 @@ export function UsagePage() {
         </div>
       )}
 
-      <div className={styles.header}>
-        <h1 className={styles.pageTitle}>{t('usage_stats.title')}</h1>
-        <div className={styles.headerActions}>
+      <div className={`page-header ${styles.header}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('usage_stats.title')}</h1>
+          <p className="page-description">{t('usage_stats.description')}</p>
+        </div>
+        <div className={`page-actions ${styles.headerActions}`}>
           <Button
             variant="secondary"
             size="sm"

@@ -329,8 +329,13 @@ export function SystemPage() {
   }, [preferredSmokeTestModel, smokeTestModel]);
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('system_info.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('system_info.title')}</h1>
+          <p className="page-description">{t('system_info.description')}</p>
+        </div>
+      </div>
       <div className={styles.content}>
       <Card
         title={t('system_info.connection_status_title')}

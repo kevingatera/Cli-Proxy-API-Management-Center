@@ -156,6 +156,7 @@
   },
   "api_keys": {
     "title": "API Keys Management",
+    "description": "Manage the proxy authentication keys and the shared display names operators use to identify them.",
     "proxy_auth_title": "Proxy Service Authentication Keys",
     "add_button": "Add Key",
     "empty_title": "No API Keys",
@@ -174,6 +175,7 @@
   },
   "ai_providers": {
     "title": "AI Providers Configuration",
+    "description": "Review upstream provider credentials, routing details, and provider-specific controls in one place.",
     "gemini_title": "Gemini API Keys",
     "gemini_add_button": "Add Key",
     "gemini_empty_title": "No Gemini Keys",
@@ -651,6 +653,7 @@
   },
   "usage_stats": {
     "title": "Usage Statistics",
+    "description": "Track request volume, token usage, cached reads, and cost estimates from a single operational view.",
     "total_requests": "Total Requests",
     "success_requests": "Success Requests",
     "failed_requests": "Failed Requests",
@@ -812,6 +815,7 @@
   },
   "system_info": {
     "title": "Management Center Info",
+    "description": "Check connection state, available models, smoke tests, and management panel resources for this proxy instance.",
     "connection_status_title": "Connection Status",
     "api_status_label": "API Status:",
     "config_status_label": "Config Status:",

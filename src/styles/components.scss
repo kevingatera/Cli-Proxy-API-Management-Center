@@ -149,15 +149,15 @@ textarea {
   }
 
   &.warning {
-    color: $warning-color;
-    border-color: rgba(245, 158, 11, 0.35);
-    background: rgba(245, 158, 11, 0.08);
+    color: var(--warning-text);
+    border-color: var(--warning-border);
+    background: var(--warning-bg);
   }
 
   &.error {
-    color: $error-color;
-    border-color: rgba(239, 68, 68, 0.35);
-    background: rgba(239, 68, 68, 0.08);
+    color: var(--error-text);
+    border-color: var(--error-border);
+    background: var(--error-bg);
   }
 
   &.muted {
@@ -611,11 +611,11 @@ textarea {
 }
 
 .error-box {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: $radius-md;
   padding: $spacing-sm $spacing-md;
-  color: $error-color;
+  color: var(--error-text);
 }
 
 .stack {

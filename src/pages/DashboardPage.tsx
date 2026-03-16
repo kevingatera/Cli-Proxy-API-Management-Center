@@ -213,10 +213,12 @@ export function DashboardPage() {
   ];
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('dashboard.title')}</h1>
-        <p className={styles.subtitle}>{t('dashboard.subtitle')}</p>
+    <div className={`page-shell ${styles.dashboard}`}>
+      <div className={`page-header ${styles.header}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('dashboard.title')}</h1>
+          <p className="page-description">{t('dashboard.subtitle')}</p>
+        </div>
       </div>
 
       <div className={styles.connectionCard}>

@@ -1491,10 +1491,12 @@ export function AuthFilesPage() {
   );
 
   return (
-    <div className={styles.container}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{t('auth_files.title')}</h1>
-        <p className={styles.description}>{t('auth_files.description')}</p>
+    <div className={`page-shell ${styles.container}`}>
+      <div className={`page-header ${styles.pageHeader}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('auth_files.title')}</h1>
+          <p className="page-description">{t('auth_files.description')}</p>
+        </div>
       </div>
 
       <Card
