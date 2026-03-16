@@ -53,6 +53,15 @@ export const saveApiKeyLabels = (labels: Record<string, string>): void => {
   }
 };
 
+export const clearApiKeyLabels = (): void => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(API_KEY_LABELS_STORAGE_KEY);
+  } catch {
+    console.warn('failed to clear API key labels');
+  }
+};
+
 export const getCustomApiKeyLabel = (key: string, labels: Record<string, string>): string => {
   const fingerprint = getApiKeyFingerprint(key);
   return String(labels[fingerprint] ?? '').trim();

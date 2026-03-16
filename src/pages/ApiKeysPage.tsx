@@ -9,11 +9,11 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { apiKeysApi } from '@/services/api';
 import {
+  clearApiKeyLabels,
   getApiKeyDisplayLabel,
   getCustomApiKeyLabel,
   loadApiKeyLabels,
   removeCustomApiKeyLabel,
-  saveApiKeyLabels,
   setCustomApiKeyLabel,
 } from '@/utils/apiKeyNames';
 import { maskApiKey } from '@/utils/format';
@@ -31,7 +31,7 @@ export function ApiKeysPage() {
   const clearCache = useConfigStore((state) => state.clearCache);
 
   const [apiKeys, setApiKeys] = useState<string[]>([]);
-  const [apiKeyLabels, setApiKeyLabels] = useState<Record<string, string>>(() => loadApiKeyLabels());
+  const [apiKeyLabels, setApiKeyLabels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -42,10 +42,44 @@ export function ApiKeysPage() {
 
   const disableControls = useMemo(() => connectionStatus !== 'connected', [connectionStatus]);
 
-  const persistLabels = useCallback((nextLabels: Record<string, string>) => {
-    setApiKeyLabels(nextLabels);
-    saveApiKeyLabels(nextLabels);
-  }, []);
+  const syncLabelsToServer = useCallback(
+    async (labels: Record<string, string>) => {
+      await apiKeysApi.replaceLabels(labels);
+      setApiKeyLabels(labels);
+    },
+    []
+  );
+
+  const migrateLocalLabels = useCallback(
+    async (keys: string[], serverLabels: Record<string, string>) => {
+      const localLabels = loadApiKeyLabels();
+      if (!Object.keys(localLabels).length) {
+        return serverLabels;
+      }
+
+      let nextLabels = { ...serverLabels };
+      let changed = false;
+      keys.forEach((key) => {
+        const localLabel = getCustomApiKeyLabel(key, localLabels);
+        const serverLabel = getCustomApiKeyLabel(key, serverLabels);
+        if (!localLabel || serverLabel) {
+          return;
+        }
+        nextLabels = setCustomApiKeyLabel(nextLabels, key, localLabel);
+        changed = true;
+      });
+
+      if (!changed) {
+        clearApiKeyLabels();
+        return serverLabels;
+      }
+
+      await syncLabelsToServer(nextLabels);
+      clearApiKeyLabels();
+      return nextLabels;
+    },
+    [syncLabelsToServer]
+  );
 
   const loadApiKeys = useCallback(
     async (force = false) => {
@@ -53,14 +87,18 @@ export function ApiKeysPage() {
       setError('');
       try {
         const result = (await fetchConfig('api-keys', force)) as string[] | undefined;
-        setApiKeys(Array.isArray(result) ? result : []);
+        const list = Array.isArray(result) ? result : [];
+        setApiKeys(list);
+        const serverLabels = await apiKeysApi.listLabels();
+        const migratedLabels = await migrateLocalLabels(list, serverLabels);
+        setApiKeyLabels(migratedLabels);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : t('notification.refresh_failed'));
       } finally {
         setLoading(false);
       }
     },
-    [fetchConfig, t]
+    [fetchConfig, migrateLocalLabels, t]
   );
 
   useEffect(() => {
@@ -111,6 +149,8 @@ export function ApiKeysPage() {
     const nextKeys = isEdit
       ? apiKeys.map((key, idx) => (idx === editingIndex ? trimmed : key))
       : [...apiKeys, trimmed];
+    let nextLabels = previousKey ? removeCustomApiKeyLabel(apiKeyLabels, previousKey) : { ...apiKeyLabels };
+    nextLabels = setCustomApiKeyLabel(nextLabels, trimmed, labelValue);
 
     setSaving(true);
     try {
@@ -122,11 +162,8 @@ export function ApiKeysPage() {
         showNotification(t('notification.api_key_added'), 'success');
       }
 
-      let nextLabels = previousKey ? removeCustomApiKeyLabel(apiKeyLabels, previousKey) : { ...apiKeyLabels };
-      nextLabels = setCustomApiKeyLabel(nextLabels, trimmed, labelValue);
-
+      await syncLabelsToServer(nextLabels);
       setApiKeys(nextKeys);
-      persistLabels(nextLabels);
       updateConfigValue('api-keys', nextKeys);
       clearCache('api-keys');
       closeModal();
@@ -165,8 +202,9 @@ export function ApiKeysPage() {
         try {
           await apiKeysApi.delete(deleteIndex);
           const nextKeys = currentKeys.filter((_, idx) => idx !== deleteIndex);
+          const nextLabels = removeCustomApiKeyLabel(apiKeyLabels, apiKeyToDelete);
+          await syncLabelsToServer(nextLabels);
           setApiKeys(nextKeys);
-          persistLabels(removeCustomApiKeyLabel(apiKeyLabels, apiKeyToDelete));
           updateConfigValue('api-keys', nextKeys);
           clearCache('api-keys');
           showNotification(t('notification.api_key_deleted'), 'success');
