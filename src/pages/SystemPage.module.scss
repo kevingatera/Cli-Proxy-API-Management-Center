@@ -113,13 +113,33 @@
 
 .smokeTestGrid {
   display: grid;
-  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: $spacing-lg;
   align-items: start;
+}
 
-  @media (max-width: 960px) {
+.smokeTestModelRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: $spacing-md;
+  align-items: start;
+
+  @media (max-width: 720px) {
     grid-template-columns: 1fr;
   }
+}
+
+.smokeTestModelInput {
+  margin-bottom: 0;
+}
+
+.smokeTestVariantField {
+  margin-bottom: 0;
+}
+
+.smokeTestVariantSelect {
+  width: 100%;
+  min-height: 42px;
 }
 
 .smokeTestTextarea {

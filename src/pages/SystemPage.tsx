@@ -12,6 +12,37 @@ import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import styles from './SystemPage.module.scss';
 
 const SYSTEM_MODEL_TEST_TIMEOUT_MS = 30_000;
+const SMOKE_TEST_VARIANTS = ['', 'fast', 'minimal', 'low', 'medium', 'high', 'xhigh', 'auto', 'none'];
+
+const splitSmokeTestModel = (value: string): { model: string; variant: string } => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return { model: '', variant: '' };
+  }
+
+  const lastSlash = trimmed.lastIndexOf('/');
+  if (lastSlash <= 0 || lastSlash === trimmed.length - 1) {
+    return { model: trimmed, variant: '' };
+  }
+
+  const tail = trimmed.slice(lastSlash + 1).trim().toLowerCase();
+  if (!SMOKE_TEST_VARIANTS.includes(tail)) {
+    return { model: trimmed, variant: '' };
+  }
+
+  return {
+    model: trimmed.slice(0, lastSlash).trim(),
+    variant: tail,
+  };
+};
+
+const buildSmokeTestModel = (model: string, variant: string): string => {
+  const trimmedModel = String(model || '').trim();
+  const trimmedVariant = String(variant || '').trim();
+  if (!trimmedModel) return '';
+  if (!trimmedVariant) return trimmedModel;
+  return `${trimmedModel}/${trimmedVariant}`;
+};
 
 const normalizeProxyBaseUrl = (baseUrl: string): string => {
   let normalized = String(baseUrl || '').trim();
@@ -83,6 +114,7 @@ export function SystemPage() {
 
   const [modelStatus, setModelStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'muted'; message: string }>();
   const [smokeTestModel, setSmokeTestModel] = useState('');
+  const [smokeTestVariant, setSmokeTestVariant] = useState('');
   const [smokeTestPrompt, setSmokeTestPrompt] = useState(() => 'Reply with OK only.');
   const [smokeTestRunning, setSmokeTestRunning] = useState(false);
   const [smokeTestStatus, setSmokeTestStatus] = useState<{
@@ -102,7 +134,7 @@ export function SystemPage() {
     [i18n.language]
   );
   const groupedModels = useMemo(() => classifyModels(models, { otherLabel }), [models, otherLabel]);
-  const modelOptions = useMemo(() => models.map((model) => model.name).filter(Boolean), [models]);
+  const modelOptions = useMemo(() => Array.from(new Set(models.map((model) => model.name).filter(Boolean))).sort(), [models]);
   const preferredSmokeTestModel = useMemo(() => {
     const names = new Set(modelOptions);
     if (names.has('gpt-5.4')) return 'gpt-5.4/fast';
@@ -192,7 +224,7 @@ export function SystemPage() {
       return;
     }
 
-    const modelName = smokeTestModel.trim();
+    const modelName = buildSmokeTestModel(smokeTestModel, smokeTestVariant);
     if (!modelName) {
       const message = t('system_info.smoke_test_model_required');
       setSmokeTestStatus({ type: 'error', message });
@@ -289,6 +321,7 @@ export function SystemPage() {
     showNotification,
     smokeTestModel,
     smokeTestPrompt,
+    smokeTestVariant,
     t,
   ]);
 
@@ -324,7 +357,9 @@ export function SystemPage() {
       return;
     }
     if (preferredSmokeTestModel) {
-      setSmokeTestModel(preferredSmokeTestModel);
+      const parsed = splitSmokeTestModel(preferredSmokeTestModel);
+      setSmokeTestModel(parsed.model);
+      setSmokeTestVariant(parsed.variant);
     }
   }, [preferredSmokeTestModel, smokeTestModel]);
 
@@ -470,14 +505,33 @@ export function SystemPage() {
       <Card title={t('system_info.smoke_test_title')}>
         <p className={styles.sectionDescription}>{t('system_info.smoke_test_desc')}</p>
         <div className={styles.smokeTestGrid}>
-          <AutocompleteInput
-            label={t('system_info.smoke_test_model_label')}
-            value={smokeTestModel}
-            onChange={setSmokeTestModel}
-            options={modelOptions}
-            placeholder={t('system_info.smoke_test_model_placeholder')}
-            hint={t('system_info.smoke_test_model_hint')}
-          />
+          <div className={styles.smokeTestModelRow}>
+            <AutocompleteInput
+              label={t('system_info.smoke_test_model_label')}
+              value={smokeTestModel}
+              onChange={setSmokeTestModel}
+              options={modelOptions}
+              placeholder={t('system_info.smoke_test_model_placeholder')}
+              hint={t('system_info.smoke_test_model_hint')}
+              wrapperClassName={styles.smokeTestModelInput}
+            />
+            <div className={`form-group ${styles.smokeTestVariantField}`}>
+              <label>{t('system_info.smoke_test_variant_label')}</label>
+              <select
+                className={styles.smokeTestVariantSelect}
+                value={smokeTestVariant}
+                onChange={(event) => setSmokeTestVariant(event.target.value)}
+              >
+                <option value="">{t('system_info.smoke_test_variant_default')}</option>
+                {SMOKE_TEST_VARIANTS.filter((variant) => variant).map((variant) => (
+                  <option key={variant} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">{t('system_info.smoke_test_variant_hint')}</div>
+            </div>
+          </div>
           <div className="form-group">
             <label>{t('system_info.smoke_test_prompt_label')}</label>
             <textarea

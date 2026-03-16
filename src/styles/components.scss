@@ -73,7 +73,8 @@
 }
 
 .input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--border-color);
   border-radius: $radius-md;
