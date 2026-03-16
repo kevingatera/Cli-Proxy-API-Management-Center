@@ -130,6 +130,7 @@ export const useAuthStore = create<AuthStoreState>()(
       logout: () => {
         restoreSessionPromise = null;
         useConfigStore.getState().clearCache();
+        apiClient.setConfig({ apiBase: '', managementKey: '' });
         set({
           isAuthenticated: false,
           apiBase: '',

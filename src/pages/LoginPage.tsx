@@ -91,9 +91,16 @@ export function LoginPage() {
     return <Navigate to={redirect} replace />;
   }
 
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!loading) {
+      void handleSubmit();
+    }
+  };
+
   return (
     <div className="login-page">
-      <div className="login-card">
+      <form className="login-card" onSubmit={handleFormSubmit} noValidate>
         <div className="login-header">
           <div className="login-title-row">
             <div className="title">{t('title.login')}</div>
@@ -177,7 +184,7 @@ export function LoginPage() {
           <label htmlFor="remember-password-toggle">{t('login.remember_password_label')}</label>
         </div>
 
-        <Button fullWidth onClick={handleSubmit} loading={loading}>
+        <Button type="submit" fullWidth loading={loading}>
           {loading ? t('login.submitting') : t('login.submit_button')}
         </Button>
 
@@ -189,7 +196,7 @@ export function LoginPage() {
             <div className="value">{t('auto_login.message')}</div>
           </div>
         )}
-      </div>
+      </form>
     </div>
   );
 }

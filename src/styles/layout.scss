@@ -415,6 +415,11 @@
   background: var(--bg-secondary);
   padding: $spacing-lg;
 
+  @media (max-width: $breakpoint-mobile) {
+    align-items: flex-start;
+    padding: $spacing-md;
+  }
+
   .login-card {
     width: 100%;
     max-width: 520px;
@@ -426,6 +431,14 @@
     display: flex;
     flex-direction: column;
     gap: $spacing-lg;
+
+    @media (max-width: $breakpoint-mobile) {
+      max-width: none;
+      max-height: calc(100vh - #{$spacing-md * 2});
+      overflow: auto;
+      padding: $spacing-lg;
+      gap: $spacing-md;
+    }
   }
 
   .login-header {
@@ -442,6 +455,10 @@
 
     .subtitle {
       color: var(--text-secondary);
+    }
+
+    @media (max-width: $breakpoint-mobile) {
+      text-align: left;
     }
   }
 
@@ -474,6 +491,7 @@
     .value {
       font-weight: 700;
       color: var(--text-primary);
+      word-break: break-word;
     }
 
     .item-actions {
@@ -489,6 +507,7 @@
     gap: $spacing-xs;
     color: var(--text-secondary);
     cursor: pointer;
+    flex-wrap: wrap;
   }
 
   .error-box {
