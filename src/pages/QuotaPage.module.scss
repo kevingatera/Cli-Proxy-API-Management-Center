@@ -136,6 +136,10 @@
   flex-wrap: wrap;
   align-items: flex-end;
   margin-bottom: $spacing-md;
+  padding: $spacing-md;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background: var(--bg-primary);
 }
 
 .antigravityControl,
