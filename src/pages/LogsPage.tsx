@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +19,7 @@ import {
   IconX,
 } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { logsApi } from '@/services/api/logs';
 import { MANAGEMENT_API_PREFIX } from '@/utils/constants';
@@ -76,6 +77,15 @@ const loadLogsViewState = (): {
     };
   } catch {
     return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+  }
+};
+
+const clearLogsViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(LOGS_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
   }
 };
 
@@ -798,17 +808,24 @@ export function LogsPage() {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(
-        LOGS_VIEW_STATE_KEY,
-        JSON.stringify({ activeTab, autoRefresh, searchQuery, hideManagementLogs })
-      );
-    } catch {
-      // ignore persistence failures
-    }
-  }, [activeTab, autoRefresh, searchQuery, hideManagementLogs]);
+  const applyViewState = useCallback((value: {
+    activeTab?: TabType;
+    autoRefresh?: boolean;
+    searchQuery?: string;
+    hideManagementLogs?: boolean;
+  }) => {
+    setActiveTab(value.activeTab === 'errors' ? 'errors' : 'logs');
+    if (typeof value.autoRefresh === 'boolean') setAutoRefresh(value.autoRefresh);
+    if (typeof value.searchQuery === 'string') setSearchQuery(value.searchQuery);
+    if (typeof value.hideManagementLogs === 'boolean') setHideManagementLogs(value.hideManagementLogs);
+  }, []);
+
+  useServerPreferenceSync(
+    'logs-view',
+    { activeTab, autoRefresh, searchQuery, hideManagementLogs },
+    applyViewState,
+    { readLegacy: loadLogsViewState, clearLegacy: clearLogsViewState }
+  );
 
   return (
     <div className={styles.container}>

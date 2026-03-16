@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useThemeStore } from '@/stores';
 import {
   StatCards,
@@ -61,6 +62,15 @@ const loadUsageViewState = (): {
   }
 };
 
+const clearUsageViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(USAGE_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
+  }
+};
+
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -78,6 +88,7 @@ export function UsagePage() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
+  const savedViewState = useMemo(() => loadUsageViewState(), []);
 
   // Data hook
   const {
@@ -122,22 +133,24 @@ export function UsagePage() {
     tokensChartOptions
   } = useChartData({ usage, chartLines, isDark, isMobile });
 
-  useEffect(() => {
-    setRequestsPeriod(savedViewState.requestsPeriod);
-    setTokensPeriod(savedViewState.tokensPeriod);
-  }, [savedViewState.requestsPeriod, savedViewState.tokensPeriod, setRequestsPeriod, setTokensPeriod]);
-
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(
-        USAGE_VIEW_STATE_KEY,
-        JSON.stringify({ chartLines, requestsPeriod, tokensPeriod })
-      );
-    } catch {
-      // ignore persistence failures
+  const applyViewState = useCallback((value: {
+    chartLines?: string[];
+    requestsPeriod?: ChartPeriod;
+    tokensPeriod?: ChartPeriod;
+  }) => {
+    if (Array.isArray(value.chartLines) && value.chartLines.length) {
+      setChartLines(value.chartLines);
     }
-  }, [chartLines, requestsPeriod, tokensPeriod]);
+    setRequestsPeriod(value.requestsPeriod === 'hour' ? 'hour' : 'day');
+    setTokensPeriod(value.tokensPeriod === 'hour' ? 'hour' : 'day');
+  }, [setRequestsPeriod, setTokensPeriod]);
+
+  useServerPreferenceSync(
+    'usage-view',
+    { chartLines, requestsPeriod, tokensPeriod },
+    applyViewState,
+    { readLegacy: loadUsageViewState, clearLegacy: clearUsageViewState }
+  );
 
   // Derived data
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
@@ -261,4 +274,3 @@ export function UsagePage() {
     </div>
   );
 }
-  const savedViewState = useMemo(() => loadUsageViewState(), []);

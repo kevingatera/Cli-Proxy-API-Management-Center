@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconChevronDown, IconChevronUp, IconSearch } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useNotificationStore, useAuthStore, useThemeStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
@@ -24,6 +25,15 @@ const loadConfigViewState = () => {
     return { searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '' };
   } catch {
     return { searchQuery: '' };
+  }
+};
+
+const clearConfigViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(CONFIG_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
   }
 };
 
@@ -212,14 +222,18 @@ export function ConfigPage() {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(CONFIG_VIEW_STATE_KEY, JSON.stringify({ searchQuery }));
-    } catch {
-      // ignore persistence failures
+  const applyViewState = useCallback((value: { searchQuery?: string }) => {
+    if (typeof value.searchQuery === 'string') {
+      setSearchQuery(value.searchQuery);
     }
-  }, [searchQuery]);
+  }, []);
+
+  useServerPreferenceSync(
+    'config-view',
+    { searchQuery },
+    applyViewState,
+    { readLegacy: loadConfigViewState, clearLegacy: clearConfigViewState }
+  );
 
   // CodeMirror extensions
   const extensions = useMemo(() => [

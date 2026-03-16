@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -120,6 +121,15 @@ const loadAuthFilesViewState = () => {
     };
   } catch {
     return { filter: 'all', search: '', pageSize: 9 };
+  }
+};
+
+const clearAuthFilesViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(AUTH_FILES_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
   }
 };
 
@@ -293,17 +303,27 @@ export function AuthFilesPage() {
     setPageSizeInput(String(pageSize));
   }, [pageSize]);
 
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(
-        AUTH_FILES_VIEW_STATE_KEY,
-        JSON.stringify({ filter, search, pageSize })
-      );
-    } catch {
-      // ignore persistence failures
+  const applyViewState = useCallback((value: { filter?: string; search?: string; pageSize?: number }) => {
+    if (typeof value.filter === 'string' && value.filter.trim()) {
+      setFilter(value.filter);
     }
-  }, [filter, search, pageSize]);
+    if (typeof value.search === 'string') {
+      setSearch(value.search);
+    }
+    if (typeof value.pageSize === 'number' && Number.isFinite(value.pageSize)) {
+      const nextPageSize = clampCardPageSize(value.pageSize);
+      setPageSize(nextPageSize);
+      setPageSizeInput(String(nextPageSize));
+    }
+    setPage(1);
+  }, []);
+
+  useServerPreferenceSync(
+    'auth-files-view',
+    { filter, search, pageSize },
+    applyViewState,
+    { readLegacy: loadAuthFilesViewState, clearLegacy: clearAuthFilesViewState }
+  );
 
   // 模型定义缓存（按 channel 缓存）
   const modelDefinitionsCacheRef = useRef<Map<string, AuthFileModelItem[]>>(new Map());
