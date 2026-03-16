@@ -325,10 +325,10 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: $radius-full;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   border: 1px solid var(--border-color);
   background: var(--bg-primary);
   color: var(--text-secondary);
@@ -338,7 +338,7 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: $radius-full;
   font-size: 12px;
   font-weight: 600;
@@ -384,15 +384,15 @@
 }
 
 .statusWarn {
-  color: var(--warning-color);
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.25);
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
 }
 
 .statusError {
-  color: var(--failure-badge-text);
-  background: var(--failure-badge-bg);
-  border-color: var(--failure-badge-border);
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-color: var(--error-border);
 }
 
 .levelInfo {
@@ -402,15 +402,15 @@
 }
 
 .levelWarn {
-  color: var(--warning-color);
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.25);
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
 }
 
 .levelError {
-  color: var(--error-color);
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-color: var(--error-border);
 }
 
 .levelDebug,

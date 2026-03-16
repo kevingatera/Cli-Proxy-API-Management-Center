@@ -45,6 +45,7 @@
   min-width: 24px;
   padding: 0 8px;
   border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
   font-size: 13px;
   font-weight: 600;
   color: var(--count-badge-text);
@@ -469,7 +470,8 @@
 
 .typeBadge {
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: $radius-full;
+  border: 1px solid transparent;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -585,7 +587,7 @@
   font-weight: 600;
   white-space: nowrap;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: $radius-md;
   background: var(--bg-tertiary);
 }
 
@@ -595,13 +597,13 @@
 }
 
 .statusRateMedium {
-  color: var(--warning-text, #92400e);
-  background: var(--warning-bg, #fef3c7);
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .statusRateLow {
-  color: var(--failure-badge-text, #991b1b);
-  background: var(--failure-badge-bg, #fee2e2);
+  color: var(--error-text);
+  background: var(--error-bg);
 }
 
 .prefixProxyEditor {
@@ -625,9 +627,9 @@
 .prefixProxyError {
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
-  border: 1px solid var(--danger-color);
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--danger-color);
+  border: 1px solid var(--error-border);
+  background-color: var(--error-bg);
+  color: var(--error-text);
   font-size: 12px;
 }
 
