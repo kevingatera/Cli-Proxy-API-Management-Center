@@ -178,6 +178,10 @@
   "ai_providers": {
     "title": "AI 提供商配置",
     "description": "集中查看上游提供商凭据、路由细节与各类 provider 专属控制项。",
+    "progress_loading": "正在加载 provider 配置...",
+    "progress_saving": "正在保存 provider 变更...",
+    "progress_switching": "正在应用启用/停用切换...",
+    "progress_ampcode": "正在更新 Ampcode 设置...",
     "gemini_title": "Gemini API 密钥",
     "gemini_add_button": "添加密钥",
     "gemini_empty_title": "暂无Gemini密钥",

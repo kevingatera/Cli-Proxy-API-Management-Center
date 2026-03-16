@@ -260,6 +260,8 @@ export function ConfigPage() {
     return '';
   };
 
+  const progressBanner = loading || saving ? getStatusText() : '';
+
   return (
     <div className={styles.container}>
       <h1 className={styles.pageTitle}>{t('config_management.title')}</h1>
@@ -269,6 +271,7 @@ export function ConfigPage() {
         <div className={styles.content}>
           {/* Editor */}
           {error && <div className="error-box">{error}</div>}
+          {progressBanner && <div className={`status-badge warning ${styles.progressBanner}`}>{progressBanner}</div>}
           <div className={styles.editorWrapper} ref={editorWrapperRef}>
             {/* Floating search controls */}
             <div className={styles.floatingControls} ref={floatingControlsRef}>

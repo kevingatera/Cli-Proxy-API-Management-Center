@@ -178,6 +178,10 @@
   "ai_providers": {
     "title": "AI Providers Configuration",
     "description": "Review upstream provider credentials, routing details, and provider-specific controls in one place.",
+    "progress_loading": "Loading provider configuration...",
+    "progress_saving": "Saving provider changes...",
+    "progress_switching": "Applying enable/disable changes...",
+    "progress_ampcode": "Updating Ampcode settings...",
     "gemini_title": "Gemini API Keys",
     "gemini_add_button": "Add Key",
     "gemini_empty_title": "No Gemini Keys",

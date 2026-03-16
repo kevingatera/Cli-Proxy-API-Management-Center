@@ -531,6 +531,17 @@ export function saveModelPrices(prices: Record<string, ModelPrice>): void {
   }
 }
 
+export function clearModelPrices(): void {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+    localStorage.removeItem(MODEL_PRICE_STORAGE_KEY);
+  } catch {
+    console.warn('清除模型价格失败');
+  }
+}
+
 /**
  * 获取 API 统计数据
  */

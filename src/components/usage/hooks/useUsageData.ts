@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useNotificationStore } from '@/stores';
 import { usageApi } from '@/services/api/usage';
-import { loadModelPrices, saveModelPrices, type ModelPrice } from '@/utils/usage';
+import { clearModelPrices, loadModelPrices, saveModelPrices, type ModelPrice } from '@/utils/usage';
 import {
   OPENROUTER_REMOTE_SYNC_INTERVAL_MS,
   fetchBundledOpenRouterPrices,
@@ -147,6 +148,13 @@ export function useUsageData(): UseUsageDataReturn {
     setModelPrices(prices);
     saveModelPrices(prices);
   }, []);
+
+  useServerPreferenceSync(
+    'usage-model-prices',
+    modelPrices,
+    handleSetModelPrices,
+    { readLegacy: loadModelPrices, clearLegacy: clearModelPrices }
+  );
 
   useEffect(() => {
     if (!usage || syncingPricesRef.current) {

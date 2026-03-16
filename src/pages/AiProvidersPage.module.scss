@@ -29,6 +29,10 @@
   gap: $spacing-xl;
 }
 
+.progressBanner {
+  margin-bottom: -$spacing-md;
+}
+
 .section {
   display: flex;
   flex-direction: column;

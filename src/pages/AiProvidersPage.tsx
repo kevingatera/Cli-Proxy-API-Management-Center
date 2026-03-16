@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { entriesToModels } from '@/components/ui/ModelInputList';
 import {
@@ -54,6 +54,14 @@ export function AiProvidersPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isSwitching = Boolean(configSwitchingKey);
+
+  const progressMessage = useMemo(() => {
+    if (saving) return t('ai_providers.progress_saving');
+    if (isSwitching) return t('ai_providers.progress_switching');
+    if (ampcodeBusy) return t('ai_providers.progress_ampcode');
+    if (loading) return t('ai_providers.progress_loading');
+    return '';
+  }, [ampcodeBusy, isSwitching, loading, saving, t]);
 
   const { keyStats, usageDetails, loadKeyStats } = useProviderStats();
 
@@ -548,6 +556,7 @@ export function AiProvidersPage() {
       </div>
       <div className={styles.content}>
         {error && <div className="error-box">{error}</div>}
+        {progressMessage && <div className={`status-badge warning ${styles.progressBanner}`}>{progressMessage}</div>}
 
         <GeminiSection
           configs={geminiKeys}
