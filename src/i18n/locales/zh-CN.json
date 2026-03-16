@@ -120,6 +120,7 @@
   },
   "basic_settings": {
     "title": "基础设置",
+    "description": "调整当前代理实例的核心路由、代理、配额、日志和重试行为。",
     "debug_title": "调试模式",
     "debug_enable": "启用调试模式",
     "proxy_title": "代理设置",

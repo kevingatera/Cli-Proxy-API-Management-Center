@@ -250,8 +250,13 @@ export function SettingsPage() {
   const quotaSwitchPreview = config?.quotaExceeded?.switchPreviewModel ?? false;
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('basic_settings.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('basic_settings.title')}</h1>
+          <p className="page-description">{t('basic_settings.description')}</p>
+        </div>
+      </div>
 
       <div className={styles.grid}>
         <Card>
@@ -328,6 +333,32 @@ export function SettingsPage() {
           </div>
         </Card>
 
+      <Card title={t('basic_settings.routing_title')}>
+        <div className={`${styles.retryRow} ${styles.retryRowAligned} ${styles.retryRowInputGrow}`}>
+          <div className="form-group">
+            <label>{t('basic_settings.routing_strategy_label')}</label>
+            <select
+              className="input"
+              value={routingStrategy}
+              onChange={(e) => setRoutingStrategy(e.target.value)}
+              disabled={disableControls || loading}
+            >
+              <option value="round-robin">{t('basic_settings.routing_strategy_round_robin')}</option>
+              <option value="fill-first">{t('basic_settings.routing_strategy_fill_first')}</option>
+            </select>
+            <div className="hint">{t('basic_settings.routing_strategy_hint')}</div>
+          </div>
+          <Button
+            className={styles.retryButton}
+            onClick={handleRoutingStrategyUpdate}
+            loading={pending.routingStrategy}
+            disabled={disableControls || loading}
+          >
+            {t('basic_settings.routing_strategy_update')}
+          </Button>
+        </div>
+      </Card>
+
       <Card title={t('basic_settings.proxy_title')}>
         <Input
           label={t('basic_settings.proxy_url_label')}
@@ -391,32 +422,6 @@ export function SettingsPage() {
             disabled={disableControls || loading}
           >
             {t('basic_settings.logs_max_total_size_update')}
-          </Button>
-        </div>
-      </Card>
-
-      <Card title={t('basic_settings.routing_title')}>
-        <div className={`${styles.retryRow} ${styles.retryRowAligned} ${styles.retryRowInputGrow}`}>
-          <div className="form-group">
-            <label>{t('basic_settings.routing_strategy_label')}</label>
-            <select
-              className="input"
-              value={routingStrategy}
-              onChange={(e) => setRoutingStrategy(e.target.value)}
-              disabled={disableControls || loading}
-            >
-              <option value="round-robin">{t('basic_settings.routing_strategy_round_robin')}</option>
-              <option value="fill-first">{t('basic_settings.routing_strategy_fill_first')}</option>
-            </select>
-            <div className="hint">{t('basic_settings.routing_strategy_hint')}</div>
-          </div>
-          <Button
-            className={styles.retryButton}
-            onClick={handleRoutingStrategyUpdate}
-            loading={pending.routingStrategy}
-            disabled={disableControls || loading}
-          >
-            {t('basic_settings.routing_strategy_update')}
           </Button>
         </div>
       </Card>

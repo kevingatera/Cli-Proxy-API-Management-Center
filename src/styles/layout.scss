@@ -196,6 +196,10 @@
 
     @media (max-width: $breakpoint-mobile) {
       gap: 2px;
+
+      .desktop-preferred {
+        display: none;
+      }
     }
   }
 
@@ -451,10 +455,18 @@
       font-size: 22px;
       font-weight: 800;
       color: var(--text-primary);
+
+      @media (max-width: $breakpoint-mobile) {
+        font-size: 18px;
+      }
     }
 
     .subtitle {
       color: var(--text-secondary);
+
+      @media (max-width: $breakpoint-mobile) {
+        font-size: 14px;
+      }
     }
 
     @media (max-width: $breakpoint-mobile) {
@@ -468,6 +480,11 @@
     justify-content: center;
     gap: $spacing-sm;
     flex-wrap: wrap;
+
+    @media (max-width: $breakpoint-mobile) {
+      justify-content: space-between;
+      align-items: flex-start;
+    }
   }
 
   .login-language-btn {
@@ -497,6 +514,15 @@
     .item-actions {
       display: flex;
       gap: $spacing-md;
+    }
+
+    @media (max-width: $breakpoint-mobile) {
+      padding: $spacing-sm $spacing-md;
+
+      .label,
+      .hint {
+        font-size: 13px;
+      }
     }
   }
 

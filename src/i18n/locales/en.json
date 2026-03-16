@@ -120,6 +120,7 @@
   },
   "basic_settings": {
     "title": "Basic Settings",
+    "description": "Adjust core routing, proxy, quota, logging, and retry behavior for this proxy instance.",
     "debug_title": "Debug Mode",
     "debug_enable": "Enable Debug Mode",
     "proxy_title": "Proxy Settings",

@@ -490,6 +490,7 @@ export function MainLayout() {
               {headerIcons.refresh}
             </Button>
             <Button
+              className="desktop-preferred"
               variant="ghost"
               size="sm"
               onClick={handleVersionCheck}
@@ -498,7 +499,7 @@ export function MainLayout() {
             >
               {headerIcons.update}
             </Button>
-            <Button variant="ghost" size="sm" onClick={toggleLanguage} title={t('language.switch')}>
+            <Button className="desktop-preferred" variant="ghost" size="sm" onClick={toggleLanguage} title={t('language.switch')}>
               {headerIcons.language}
             </Button>
             <Button variant="ghost" size="sm" onClick={cycleTheme} title={t('theme.switch')}>
