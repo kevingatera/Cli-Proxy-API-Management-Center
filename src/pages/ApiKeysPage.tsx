@@ -156,6 +156,10 @@ export function ApiKeysPage() {
     nextLabels = setCustomApiKeyLabel(nextLabels, trimmed, labelValue);
 
     setSaving(true);
+    const previousKeys = apiKeys;
+    const previousLabels = apiKeyLabels;
+    setApiKeys(nextKeys);
+    setApiKeyLabels(nextLabels);
     try {
       if (isEdit && editingIndex !== null) {
         await apiKeysApi.update(editingIndex, trimmed);
@@ -166,13 +170,14 @@ export function ApiKeysPage() {
       }
 
       await syncLabelsToServer(nextLabels);
-      setApiKeys(nextKeys);
       updateConfigValue('api-keys', nextKeys);
       clearCache('api-keys');
       closeModal();
     } catch (err: unknown) {
+      setApiKeys(previousKeys);
+      setApiKeyLabels(previousLabels);
       const message = err instanceof Error ? err.message : '';
-      showNotification(`${t('notification.update_failed')}: ${message}`, 'error');
+      showNotification(`${t('notification.update_failed')}: ${message}. ${t('common.reverted', { defaultValue: 'Changes reverted.' })}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -208,17 +213,20 @@ export function ApiKeysPage() {
         }
 
         try {
-          await apiKeysApi.delete(deleteIndex);
           const nextKeys = currentKeys.filter((_, idx) => idx !== deleteIndex);
           const nextLabels = removeCustomApiKeyLabel(apiKeyLabels, apiKeyToDelete);
-          await syncLabelsToServer(nextLabels);
           setApiKeys(nextKeys);
+          setApiKeyLabels(nextLabels);
+          await apiKeysApi.delete(deleteIndex);
+          await syncLabelsToServer(nextLabels);
           updateConfigValue('api-keys', nextKeys);
           clearCache('api-keys');
           showNotification(t('notification.api_key_deleted'), 'success');
         } catch (err: unknown) {
+          setApiKeys(currentKeys);
+          setApiKeyLabels(apiKeyLabels);
           const message = err instanceof Error ? err.message : '';
-          showNotification(`${t('notification.delete_failed')}: ${message}`, 'error');
+          showNotification(`${t('notification.delete_failed')}: ${message}. ${t('common.reverted', { defaultValue: 'Changes reverted.' })}`, 'error');
         }
       },
     });

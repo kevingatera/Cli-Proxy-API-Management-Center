@@ -37,6 +37,7 @@ type LogState = {
   buffer: string[];
   visibleFrom: number;
 };
+type TabType = 'logs' | 'errors';
 
 // 初始只渲染最近 100 行，滚动到顶部再逐步加载更多（避免一次性渲染过多导致卡顿）
 const INITIAL_DISPLAY_LINES = 100;
@@ -45,6 +46,38 @@ const MAX_BUFFER_LINES = 10000;
 const LOAD_MORE_THRESHOLD_PX = 72;
 const LONG_PRESS_MS = 650;
 const LONG_PRESS_MOVE_THRESHOLD = 10;
+const LOGS_VIEW_STATE_KEY = 'cliproxy-logs-view-v1';
+
+const loadLogsViewState = (): {
+  activeTab: TabType;
+  autoRefresh: boolean;
+  searchQuery: string;
+  hideManagementLogs: boolean;
+} => {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+    }
+    const raw = localStorage.getItem(LOGS_VIEW_STATE_KEY);
+    if (!raw) {
+      return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+    }
+    const parsed = JSON.parse(raw) as {
+      activeTab?: TabType;
+      autoRefresh?: boolean;
+      searchQuery?: string;
+      hideManagementLogs?: boolean;
+    };
+    return {
+      activeTab: parsed.activeTab === 'errors' ? 'errors' : 'logs',
+      autoRefresh: Boolean(parsed.autoRefresh),
+      searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '',
+      hideManagementLogs: parsed.hideManagementLogs !== false,
+    };
+  } catch {
+    return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+  }
+};
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'] as const;
 type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -369,22 +402,21 @@ const copyToClipboard = async (text: string) => {
   }
 };
 
-type TabType = 'logs' | 'errors';
-
 export function LogsPage() {
   const { t } = useTranslation();
   const { showNotification, showConfirmation } = useNotificationStore();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const requestLogEnabled = useConfigStore((state) => state.config?.requestLog ?? false);
 
-  const [activeTab, setActiveTab] = useState<TabType>('logs');
+  const savedViewState = useRef(loadLogsViewState());
+  const [activeTab, setActiveTab] = useState<TabType>(savedViewState.current.activeTab);
   const [logState, setLogState] = useState<LogState>({ buffer: [], visibleFrom: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(savedViewState.current.autoRefresh);
+  const [searchQuery, setSearchQuery] = useState(savedViewState.current.searchQuery);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [hideManagementLogs, setHideManagementLogs] = useState(true);
+  const [hideManagementLogs, setHideManagementLogs] = useState(savedViewState.current.hideManagementLogs);
   const [errorLogs, setErrorLogs] = useState<ErrorLogItem[]>([]);
   const [loadingErrors, setLoadingErrors] = useState(false);
   const [errorLogsError, setErrorLogsError] = useState('');
@@ -765,6 +797,18 @@ export function LogsPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(
+        LOGS_VIEW_STATE_KEY,
+        JSON.stringify({ activeTab, autoRefresh, searchQuery, hideManagementLogs })
+      );
+    } catch {
+      // ignore persistence failures
+    }
+  }, [activeTab, autoRefresh, searchQuery, hideManagementLogs]);
 
   return (
     <div className={styles.container}>

@@ -13,6 +13,20 @@ import { useNotificationStore, useAuthStore, useThemeStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
 
+const CONFIG_VIEW_STATE_KEY = 'cliproxy-config-view-v1';
+
+const loadConfigViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return { searchQuery: '' };
+    const raw = localStorage.getItem(CONFIG_VIEW_STATE_KEY);
+    if (!raw) return { searchQuery: '' };
+    const parsed = JSON.parse(raw) as { searchQuery?: string };
+    return { searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '' };
+  } catch {
+    return { searchQuery: '' };
+  }
+};
+
 export function ConfigPage() {
   const { t } = useTranslation();
   const { showNotification } = useNotificationStore();
@@ -26,7 +40,8 @@ export function ConfigPage() {
   const [dirty, setDirty] = useState(false);
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState('');
+  const savedViewState = useRef(loadConfigViewState());
+  const [searchQuery, setSearchQuery] = useState(savedViewState.current.searchQuery);
   const [searchResults, setSearchResults] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [lastSearchedQuery, setLastSearchedQuery] = useState('');
   const editorRef = useRef<ReactCodeMirrorRef>(null);
@@ -196,6 +211,15 @@ export function ConfigPage() {
       window.removeEventListener('resize', updatePadding);
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(CONFIG_VIEW_STATE_KEY, JSON.stringify({ searchQuery }));
+    } catch {
+      // ignore persistence failures
+    }
+  }, [searchQuery]);
 
   // CodeMirror extensions
   const extensions = useMemo(() => [

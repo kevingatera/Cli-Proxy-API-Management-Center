@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -29,6 +29,37 @@ import {
 } from '@/components/usage';
 import { getModelNamesFromUsage, getApiStats, getModelStats } from '@/utils/usage';
 import styles from './UsagePage.module.scss';
+
+const USAGE_VIEW_STATE_KEY = 'cliproxy-usage-view-v1';
+type ChartPeriod = 'hour' | 'day';
+
+const loadUsageViewState = (): {
+  chartLines: string[];
+  requestsPeriod: ChartPeriod;
+  tokensPeriod: ChartPeriod;
+} => {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+    }
+    const raw = localStorage.getItem(USAGE_VIEW_STATE_KEY);
+    if (!raw) {
+      return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+    }
+    const parsed = JSON.parse(raw) as {
+      chartLines?: string[];
+      requestsPeriod?: ChartPeriod;
+      tokensPeriod?: ChartPeriod;
+    };
+    return {
+      chartLines: Array.isArray(parsed.chartLines) && parsed.chartLines.length ? parsed.chartLines : ['all'],
+      requestsPeriod: parsed.requestsPeriod === 'hour' ? 'hour' : 'day',
+      tokensPeriod: parsed.tokensPeriod === 'hour' ? 'hour' : 'day',
+    };
+  } catch {
+    return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+  }
+};
 
 // Register Chart.js components
 ChartJS.register(
@@ -67,7 +98,7 @@ export function UsagePage() {
   useHeaderRefresh(loadUsage);
 
   // Chart lines state
-  const [chartLines, setChartLines] = useState<string[]>(['all']);
+  const [chartLines, setChartLines] = useState<string[]>(savedViewState.chartLines);
   const MAX_CHART_LINES = 9;
 
   // Sparklines hook
@@ -90,6 +121,23 @@ export function UsagePage() {
     requestsChartOptions,
     tokensChartOptions
   } = useChartData({ usage, chartLines, isDark, isMobile });
+
+  useEffect(() => {
+    setRequestsPeriod(savedViewState.requestsPeriod);
+    setTokensPeriod(savedViewState.tokensPeriod);
+  }, [savedViewState.requestsPeriod, savedViewState.tokensPeriod, setRequestsPeriod, setTokensPeriod]);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(
+        USAGE_VIEW_STATE_KEY,
+        JSON.stringify({ chartLines, requestsPeriod, tokensPeriod })
+      );
+    } catch {
+      // ignore persistence failures
+    }
+  }, [chartLines, requestsPeriod, tokensPeriod]);
 
   // Derived data
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
@@ -213,3 +261,4 @@ export function UsagePage() {
     </div>
   );
 }
+  const savedViewState = useMemo(() => loadUsageViewState(), []);
