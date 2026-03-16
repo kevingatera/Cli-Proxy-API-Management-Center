@@ -387,7 +387,7 @@ export function MainLayout() {
     clearCache();
     const results = await Promise.allSettled([
       fetchConfig(undefined, true),
-      triggerHeaderRefresh()
+      triggerHeaderRefresh(location.pathname)
     ]);
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected && rejected.status === 'rejected') {

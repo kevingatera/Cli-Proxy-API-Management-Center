@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { apiKeysApi } from '@/services/api';
 import {
@@ -111,6 +112,8 @@ export function ApiKeysPage() {
     }
   }, [config?.apiKeys]);
 
+  useHeaderRefresh(() => loadApiKeys(true));
+
   const openAddModal = () => {
     setEditingIndex(null);
     setInputValue('');
@@ -185,7 +188,12 @@ export function ApiKeysPage() {
     showConfirmation({
       title: t('common.delete'),
       message: t('api_keys.delete_confirm'),
+      details: [
+        t('api_keys.delete_detail_label', { name: getApiKeyDisplayLabel(apiKeyToDelete, apiKeyLabels) }),
+        t('api_keys.delete_detail_masked', { key: maskApiKey(String(apiKeyToDelete || '')) }),
+      ],
       variant: 'danger',
+      confirmText: t('common.delete'),
       onConfirm: async () => {
         const latestKeys = useConfigStore.getState().config?.apiKeys;
         const currentKeys = Array.isArray(latestKeys) ? latestKeys : [];

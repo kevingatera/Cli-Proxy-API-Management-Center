@@ -716,8 +716,12 @@ export function AuthFilesPage() {
     showConfirmation({
       title: t('auth_files.delete_title', { defaultValue: 'Delete File' }),
       message: `${t('auth_files.delete_confirm')} "${name}" ?`,
+      details: [
+        t('auth_files.delete_file_detail_name', { name }),
+        t('auth_files.delete_file_detail_irreversible'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('common.delete'),
       onConfirm: async () => {
         setDeleting(name);
         try {
@@ -745,8 +749,12 @@ export function AuthFilesPage() {
     showConfirmation({
       title: t('auth_files.delete_all_title', { defaultValue: 'Delete All Files' }),
       message: confirmMessage,
+      details: [
+        t('auth_files.delete_all_detail_scope', { count: files.filter((file) => !isRuntimeOnlyAuthFile(file) && (filter === 'all' || file.type === filter)).length }),
+        t('auth_files.delete_all_detail_runtime'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('auth_files.delete_all_title', { defaultValue: 'Delete All Files' }),
       onConfirm: async () => {
         setDeletingAll(true);
         try {

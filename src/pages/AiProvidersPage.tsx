@@ -20,6 +20,7 @@ import {
   withDisableAllModelsRule,
   withoutDisableAllModelsRule,
 } from '@/components/providers/utils';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { ampcodeApi, providersApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore, useThemeStore } from '@/stores';
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
@@ -119,6 +120,10 @@ export function AiProvidersPage() {
     config?.vertexApiKeys,
     config?.openaiCompatibility,
   ]);
+
+  useHeaderRefresh(async () => {
+    await Promise.all([loadConfigs(), loadKeyStats()]);
+  });
 
   const closeModal = () => {
     setModal(null);

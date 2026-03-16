@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
+  IconCopy,
   IconDownload,
   IconEyeOff,
+  IconFileText,
   IconRefreshCw,
   IconSearch,
   IconTimer,
@@ -481,8 +483,12 @@ export function LogsPage() {
     showConfirmation({
       title: t('logs.clear_confirm_title', { defaultValue: 'Clear Logs' }),
       message: t('logs.clear_confirm'),
+      details: [
+        t('logs.clear_detail_loaded', { count: logState.buffer.length }),
+        t('logs.clear_detail_download'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('logs.clear_button'),
       onConfirm: async () => {
         try {
           await logsApi.clearLogs();
@@ -722,6 +728,11 @@ export function LogsPage() {
     setRequestLogId(null);
   };
 
+  const openRequestLogModal = (id: string) => {
+    cancelLongPress();
+    setRequestLogId(id);
+  };
+
   const downloadRequestLog = async (id: string) => {
     setRequestLogDownloading(true);
     try {
@@ -909,7 +920,7 @@ export function LogsPage() {
                         onPointerCancel={cancelLongPress}
                         onPointerMove={handleLongPressMove}
                         title={t('logs.double_click_copy_hint', {
-                          defaultValue: 'Double-click to copy',
+                          defaultValue: 'Double-click to copy or use the action buttons',
                         })}
                       >
                         <div className={styles.timestamp}>{line.timestamp || ''}</div>
@@ -982,6 +993,35 @@ export function LogsPage() {
                           )}
 
                           {line.message && <span className={styles.message}>{line.message}</span>}
+
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              className={styles.rowActionButton}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void copyLogLine(line.raw);
+                              }}
+                              title={t('common.copy', { defaultValue: 'Copy' })}
+                              aria-label={t('common.copy', { defaultValue: 'Copy' })}
+                            >
+                              <IconCopy size={14} />
+                            </button>
+                            {requestLogEnabled && line.requestId && (
+                              <button
+                                type="button"
+                                className={styles.rowActionButton}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openRequestLogModal(line.requestId!);
+                                }}
+                                title={t('logs.request_log_download_title')}
+                                aria-label={t('logs.request_log_download_title')}
+                              >
+                                <IconFileText size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

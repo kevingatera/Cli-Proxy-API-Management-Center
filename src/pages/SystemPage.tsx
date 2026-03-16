@@ -4,6 +4,7 @@ import { AutocompleteInput } from '@/components/ui/AutocompleteInput';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useAuthStore, useConfigStore, useNotificationStore, useModelsStore } from '@/stores';
 import { apiKeysApi } from '@/services/api/apiKeys';
 import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
@@ -329,8 +330,12 @@ export function SystemPage() {
     showConfirmation({
       title: t('system_info.clear_login_title', { defaultValue: 'Clear Login Storage' }),
       message: t('system_info.clear_login_confirm'),
+      details: [
+        t('system_info.clear_login_detail_credentials'),
+        t('system_info.clear_login_detail_reconnect'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('system_info.clear_login_button'),
       onConfirm: () => {
         auth.logout();
         if (typeof localStorage === 'undefined') return;
@@ -351,6 +356,11 @@ export function SystemPage() {
     fetchModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.connectionStatus, auth.apiBase]);
+
+  useHeaderRefresh(async () => {
+    await fetchConfig(undefined, true);
+    await fetchModels({ forceRefresh: true });
+  });
 
   useEffect(() => {
     if (smokeTestModel.trim()) {

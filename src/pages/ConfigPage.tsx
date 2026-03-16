@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconChevronDown, IconChevronUp, IconSearch } from '@/components/ui/icons';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNotificationStore, useAuthStore, useThemeStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
@@ -52,6 +53,8 @@ export function ConfigPage() {
   useEffect(() => {
     loadConfig();
   }, [loadConfig]);
+
+  useHeaderRefresh(() => loadConfig());
 
   const handleSave = async () => {
     setSaving(true);

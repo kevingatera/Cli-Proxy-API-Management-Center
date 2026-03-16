@@ -15,7 +15,7 @@ export function ConfirmationModal() {
     return null;
   }
 
-  const { title, message, onConfirm, onCancel, confirmText, cancelText, variant = 'primary' } = options;
+  const { title, message, details, onConfirm, onCancel, confirmText, cancelText, variant = 'primary' } = options;
 
   const handleConfirm = async () => {
     try {
@@ -43,8 +43,26 @@ export function ConfirmationModal() {
 
   return (
     <Modal open={isOpen} onClose={handleCancel} title={title} closeDisabled={isLoading}>
-      <p style={{ margin: '1rem 0' }}>{message}</p>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <p style={{ margin: 0 }}>{message}</p>
+        {Array.isArray(details) && details.length > 0 && (
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: '1.1rem',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.35rem',
+            }}
+          >
+            {details.map((detail, index) => (
+              <li key={`${detail}-${index}`}>{detail}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
         <Button variant="ghost" onClick={handleCancel} disabled={isLoading}>
           {cancelText || t('common.cancel')}
         </Button>
