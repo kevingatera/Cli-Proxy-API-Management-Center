@@ -1,24 +1,51 @@
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export type HeaderRefreshHandler = () => void | Promise<void>;
 
-let activeHeaderRefreshHandler: HeaderRefreshHandler | null = null;
+const headerRefreshHandlers = new Map<string, HeaderRefreshHandler>();
 
-export const triggerHeaderRefresh = async () => {
-  if (!activeHeaderRefreshHandler) return;
-  await activeHeaderRefreshHandler();
+const normalizeRefreshKey = (pathname: string): string => {
+  const trimmed = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  return trimmed === '/dashboard' ? '/' : trimmed;
+};
+
+const resolveHeaderRefreshHandler = (pathname: string): HeaderRefreshHandler | null => {
+  const normalized = normalizeRefreshKey(pathname);
+  if (headerRefreshHandlers.has(normalized)) {
+    return headerRefreshHandlers.get(normalized) || null;
+  }
+
+  let bestMatch: HeaderRefreshHandler | null = null;
+  let bestLength = -1;
+  headerRefreshHandlers.forEach((handler, key) => {
+    if (key !== '/' && normalized.startsWith(`${key}/`) && key.length > bestLength) {
+      bestMatch = handler;
+      bestLength = key.length;
+    }
+  });
+  return bestMatch;
+};
+
+export const triggerHeaderRefresh = async (pathname: string) => {
+	const handler = resolveHeaderRefreshHandler(pathname);
+	if (!handler) return;
+	await handler();
 };
 
 export const useHeaderRefresh = (handler?: HeaderRefreshHandler | null) => {
-  useEffect(() => {
-    if (!handler) return;
+	const location = useLocation();
+	const refreshKey = normalizeRefreshKey(location.pathname);
 
-    activeHeaderRefreshHandler = handler;
+	useEffect(() => {
+		if (!handler) return;
 
-    return () => {
-      if (activeHeaderRefreshHandler === handler) {
-        activeHeaderRefreshHandler = null;
-      }
-    };
-  }, [handler]);
+		headerRefreshHandlers.set(refreshKey, handler);
+
+		return () => {
+			if (headerRefreshHandlers.get(refreshKey) === handler) {
+				headerRefreshHandlers.delete(refreshKey);
+			}
+		};
+	}, [handler, refreshKey]);
 };

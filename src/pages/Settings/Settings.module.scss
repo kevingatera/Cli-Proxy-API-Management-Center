@@ -4,17 +4,14 @@
   width: 100%;
 }
 
-.pageTitle {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 $spacing-xl 0;
-}
-
 .grid {
   display: grid;
   gap: $spacing-lg;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+
+  @include tablet {
+    gap: $spacing-md;
+  }
 
   @include mobile {
     grid-template-columns: 1fr;
@@ -104,6 +101,10 @@
 .buttonGroup {
   display: flex;
   gap: $spacing-sm;
+
+  @include mobile {
+    flex-direction: column;
+  }
 }
 
 .retryRow {

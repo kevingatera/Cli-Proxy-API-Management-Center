@@ -13,7 +13,7 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 10px;
 }
@@ -23,6 +23,10 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+
+  @include tablet {
+    width: 100%;
+  }
 }
 
 .pageTitle {
@@ -93,33 +97,30 @@
   gap: 14px;
   grid-template-columns: repeat(12, minmax(0, 1fr));
 
+  @include tablet {
+    gap: 12px;
+  }
+
   @include mobile {
     grid-template-columns: 1fr;
   }
 }
 
 .statCard {
-  --accent: #3b82f6;
-  --accent-soft: rgba(59, 130, 246, 0.18);
-  --accent-border: rgba(59, 130, 246, 0.35);
+  --accent: var(--primary-color);
+  --accent-soft: rgba(59, 130, 246, 0.08);
 
   grid-column: span 4;
   position: relative;
-  padding: 18px;
-  background:
-    radial-gradient(120% 140% at 12% 0%, var(--accent-soft) 0%, rgba(0, 0, 0, 0) 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)), var(--bg-primary);
+  padding: 16px;
+  background: var(--bg-primary);
   border-radius: $radius-lg;
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 176px;
-  box-shadow: var(--shadow-lg);
-  transition:
-    transform $transition-fast,
-    box-shadow $transition-fast,
-    border-color $transition-fast;
+  min-height: 164px;
+  transition: background-color $transition-fast, border-color $transition-fast;
   overflow: hidden;
 
   &::before {
@@ -127,25 +128,31 @@
     position: absolute;
     top: 0;
     left: 0;
-    height: 3px;
+    height: 2px;
     width: 100%;
-    background: linear-gradient(90deg, var(--accent), rgba(0, 0, 0, 0));
-    opacity: 0.95;
+    background: linear-gradient(90deg, var(--accent-soft), rgba(0, 0, 0, 0));
+    opacity: 1;
   }
 
   &:hover {
-    transform: translateY(-2px);
-    border-color: var(--accent-border);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+    border-color: var(--border-hover);
+    background: var(--bg-quinary);
   }
 
   @include tablet {
     grid-column: span 6;
+    min-height: 156px;
   }
 
   @include mobile {
     grid-column: auto;
     min-height: 168px;
+  }
+}
+
+@include tablet {
+  .statCard:last-child {
+    grid-column: span 12;
   }
 }
 
@@ -186,11 +193,10 @@
   border-radius: $radius-md;
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--primary-color);
   font-size: 13px;
-  background: var(--accent);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+  background: var(--accent-tertiary);
+  border: 1px solid rgba(59, 130, 246, 0.14);
   flex-shrink: 0;
 
   svg {
@@ -323,7 +329,7 @@
 }
 
 .apiItem {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-primary);
   border-radius: $radius-sm;
   border: 1px solid var(--border-color);
   overflow: hidden;
@@ -338,7 +344,7 @@
   transition: background-color 0.15s ease;
 
   &:hover {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-hover);
   }
 }
 
@@ -482,6 +488,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.pricingHintBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pricingHint {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .priceForm {

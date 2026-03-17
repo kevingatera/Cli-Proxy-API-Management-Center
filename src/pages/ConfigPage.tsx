@@ -8,9 +8,34 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconChevronDown, IconChevronUp, IconSearch } from '@/components/ui/icons';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useNotificationStore, useAuthStore, useThemeStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
+
+const CONFIG_VIEW_STATE_KEY = 'cliproxy-config-view-v1';
+
+const loadConfigViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return { searchQuery: '' };
+    const raw = localStorage.getItem(CONFIG_VIEW_STATE_KEY);
+    if (!raw) return { searchQuery: '' };
+    const parsed = JSON.parse(raw) as { searchQuery?: string };
+    return { searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '' };
+  } catch {
+    return { searchQuery: '' };
+  }
+};
+
+const clearConfigViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(CONFIG_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
+  }
+};
 
 export function ConfigPage() {
   const { t } = useTranslation();
@@ -25,7 +50,8 @@ export function ConfigPage() {
   const [dirty, setDirty] = useState(false);
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState('');
+  const savedViewState = useRef(loadConfigViewState());
+  const [searchQuery, setSearchQuery] = useState(savedViewState.current.searchQuery);
   const [searchResults, setSearchResults] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [lastSearchedQuery, setLastSearchedQuery] = useState('');
   const editorRef = useRef<ReactCodeMirrorRef>(null);
@@ -52,6 +78,8 @@ export function ConfigPage() {
   useEffect(() => {
     loadConfig();
   }, [loadConfig]);
+
+  useHeaderRefresh(() => loadConfig());
 
   const handleSave = async () => {
     setSaving(true);
@@ -194,6 +222,19 @@ export function ConfigPage() {
     };
   }, []);
 
+  const applyViewState = useCallback((value: { searchQuery?: string }) => {
+    if (typeof value.searchQuery === 'string') {
+      setSearchQuery(value.searchQuery);
+    }
+  }, []);
+
+  useServerPreferenceSync(
+    'config-view',
+    { searchQuery },
+    applyViewState,
+    { readLegacy: loadConfigViewState, clearLegacy: clearConfigViewState }
+  );
+
   // CodeMirror extensions
   const extensions = useMemo(() => [
     yaml(),
@@ -219,15 +260,22 @@ export function ConfigPage() {
     return '';
   };
 
+  const progressBanner = loading || saving ? getStatusText() : '';
+
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('config_management.title')}</h1>
-      <p className={styles.description}>{t('config_management.description')}</p>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('config_management.title')}</h1>
+          <p className="page-description">{t('config_management.description')}</p>
+        </div>
+      </div>
 
       <Card className={styles.configCard}>
         <div className={styles.content}>
           {/* Editor */}
           {error && <div className="error-box">{error}</div>}
+          {progressBanner && <div className={`status-badge warning ${styles.progressBanner}`}>{progressBanner}</div>}
           <div className={styles.editorWrapper} ref={editorWrapperRef}>
             {/* Floating search controls */}
             <div className={styles.floatingControls} ref={floatingControlsRef}>

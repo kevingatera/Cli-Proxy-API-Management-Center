@@ -11,6 +11,7 @@ import { NOTIFICATION_DURATION_MS } from '@/utils/constants';
 interface ConfirmationOptions {
   title?: string;
   message: string;
+  details?: string[];
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'primary' | 'secondary';

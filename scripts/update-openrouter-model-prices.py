@@ -12,13 +12,14 @@ import json
 import os
 import sys
 import urllib.request
+from typing import Any
 
 
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OUT_PATH = os.path.join("public", "model-prices", "openrouter.json")
 
 
-def to_per_million(value: object) -> float:
+def to_per_million(value: Any) -> float:
     try:
         return float(value) * 1_000_000.0
     except Exception:
@@ -39,7 +40,7 @@ def main() -> int:
 
         prompt = to_per_million(pricing.get("prompt", 0))
         completion = to_per_million(pricing.get("completion", 0))
-        cache = prompt
+        cache = to_per_million(pricing.get("input_cache_read", 0)) or prompt
         prices[model_id] = {
             "prompt": round(prompt, 10),
             "completion": round(completion, 10),
@@ -49,7 +50,10 @@ def main() -> int:
     out = {
         "version": 1,
         "source": "openrouter",
-        "fetchedAt": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "fetchedAt": datetime.datetime.now(datetime.UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "tokenUnit": "USD_per_1M_tokens",
         "prices": dict(sorted(prices.items())),
     }
@@ -65,4 +69,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

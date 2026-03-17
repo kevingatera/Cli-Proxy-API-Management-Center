@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
+  IconCopy,
   IconDownload,
   IconEyeOff,
+  IconFileText,
   IconRefreshCw,
   IconSearch,
   IconTimer,
@@ -17,6 +19,7 @@ import {
   IconX,
 } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { logsApi } from '@/services/api/logs';
 import { MANAGEMENT_API_PREFIX } from '@/utils/constants';
@@ -35,6 +38,7 @@ type LogState = {
   buffer: string[];
   visibleFrom: number;
 };
+type TabType = 'logs' | 'errors';
 
 // 初始只渲染最近 100 行，滚动到顶部再逐步加载更多（避免一次性渲染过多导致卡顿）
 const INITIAL_DISPLAY_LINES = 100;
@@ -43,6 +47,47 @@ const MAX_BUFFER_LINES = 10000;
 const LOAD_MORE_THRESHOLD_PX = 72;
 const LONG_PRESS_MS = 650;
 const LONG_PRESS_MOVE_THRESHOLD = 10;
+const LOGS_VIEW_STATE_KEY = 'cliproxy-logs-view-v1';
+
+const loadLogsViewState = (): {
+  activeTab: TabType;
+  autoRefresh: boolean;
+  searchQuery: string;
+  hideManagementLogs: boolean;
+} => {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+    }
+    const raw = localStorage.getItem(LOGS_VIEW_STATE_KEY);
+    if (!raw) {
+      return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+    }
+    const parsed = JSON.parse(raw) as {
+      activeTab?: TabType;
+      autoRefresh?: boolean;
+      searchQuery?: string;
+      hideManagementLogs?: boolean;
+    };
+    return {
+      activeTab: parsed.activeTab === 'errors' ? 'errors' : 'logs',
+      autoRefresh: Boolean(parsed.autoRefresh),
+      searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '',
+      hideManagementLogs: parsed.hideManagementLogs !== false,
+    };
+  } catch {
+    return { activeTab: 'logs', autoRefresh: false, searchQuery: '', hideManagementLogs: true };
+  }
+};
+
+const clearLogsViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(LOGS_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
+  }
+};
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'] as const;
 type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -367,22 +412,21 @@ const copyToClipboard = async (text: string) => {
   }
 };
 
-type TabType = 'logs' | 'errors';
-
 export function LogsPage() {
   const { t } = useTranslation();
   const { showNotification, showConfirmation } = useNotificationStore();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const requestLogEnabled = useConfigStore((state) => state.config?.requestLog ?? false);
 
-  const [activeTab, setActiveTab] = useState<TabType>('logs');
+  const savedViewState = useRef(loadLogsViewState());
+  const [activeTab, setActiveTab] = useState<TabType>(savedViewState.current.activeTab);
   const [logState, setLogState] = useState<LogState>({ buffer: [], visibleFrom: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(savedViewState.current.autoRefresh);
+  const [searchQuery, setSearchQuery] = useState(savedViewState.current.searchQuery);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [hideManagementLogs, setHideManagementLogs] = useState(true);
+  const [hideManagementLogs, setHideManagementLogs] = useState(savedViewState.current.hideManagementLogs);
   const [errorLogs, setErrorLogs] = useState<ErrorLogItem[]>([]);
   const [loadingErrors, setLoadingErrors] = useState(false);
   const [errorLogsError, setErrorLogsError] = useState('');
@@ -481,8 +525,12 @@ export function LogsPage() {
     showConfirmation({
       title: t('logs.clear_confirm_title', { defaultValue: 'Clear Logs' }),
       message: t('logs.clear_confirm'),
+      details: [
+        t('logs.clear_detail_loaded', { count: logState.buffer.length }),
+        t('logs.clear_detail_download'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('logs.clear_button'),
       onConfirm: async () => {
         try {
           await logsApi.clearLogs();
@@ -722,6 +770,11 @@ export function LogsPage() {
     setRequestLogId(null);
   };
 
+  const openRequestLogModal = (id: string) => {
+    cancelLongPress();
+    setRequestLogId(id);
+  };
+
   const downloadRequestLog = async (id: string) => {
     setRequestLogDownloading(true);
     try {
@@ -755,9 +808,32 @@ export function LogsPage() {
     };
   }, []);
 
+  const applyViewState = useCallback((value: {
+    activeTab?: TabType;
+    autoRefresh?: boolean;
+    searchQuery?: string;
+    hideManagementLogs?: boolean;
+  }) => {
+    setActiveTab(value.activeTab === 'errors' ? 'errors' : 'logs');
+    if (typeof value.autoRefresh === 'boolean') setAutoRefresh(value.autoRefresh);
+    if (typeof value.searchQuery === 'string') setSearchQuery(value.searchQuery);
+    if (typeof value.hideManagementLogs === 'boolean') setHideManagementLogs(value.hideManagementLogs);
+  }, []);
+
+  useServerPreferenceSync(
+    'logs-view',
+    { activeTab, autoRefresh, searchQuery, hideManagementLogs },
+    applyViewState,
+    { readLegacy: loadLogsViewState, clearLegacy: clearLogsViewState }
+  );
+
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('logs.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('logs.title')}</h1>
+        </div>
+      </div>
 
       <div className={styles.tabBar}>
         <button
@@ -909,7 +985,7 @@ export function LogsPage() {
                         onPointerCancel={cancelLongPress}
                         onPointerMove={handleLongPressMove}
                         title={t('logs.double_click_copy_hint', {
-                          defaultValue: 'Double-click to copy',
+                          defaultValue: 'Double-click to copy or use the action buttons',
                         })}
                       >
                         <div className={styles.timestamp}>{line.timestamp || ''}</div>
@@ -982,6 +1058,35 @@ export function LogsPage() {
                           )}
 
                           {line.message && <span className={styles.message}>{line.message}</span>}
+
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              className={styles.rowActionButton}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void copyLogLine(line.raw);
+                              }}
+                              title={t('common.copy', { defaultValue: 'Copy' })}
+                              aria-label={t('common.copy', { defaultValue: 'Copy' })}
+                            >
+                              <IconCopy size={14} />
+                            </button>
+                            {requestLogEnabled && line.requestId && (
+                              <button
+                                type="button"
+                                className={styles.rowActionButton}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openRequestLogModal(line.requestId!);
+                                }}
+                                title={t('logs.request_log_download_title')}
+                                aria-label={t('logs.request_log_download_title')}
+                              >
+                                <IconFileText size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

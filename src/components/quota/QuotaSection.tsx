@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -116,7 +117,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const lastUpdatedAt = useQuotaStore(config.storeLastUpdatedAtSelector);
 
   /* Removed useRef */
-  const [columns, gridRef] = useGridColumns(380); // Min card width 380px matches SCSS
+  const [columns, gridRef] = useGridColumns(340);
   const [viewMode, setViewMode] = useState<ViewMode>('paged');
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
   const [relativeNow, setRelativeNow] = useState(() => Date.now());
@@ -167,6 +168,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   }, [effectiveViewMode, columns, filteredFiles.length, setPageSize]);
 
   const { quota, loadQuota } = useQuotaLoader(config);
+  const location = useLocation();
 
   const pendingQuotaRefreshRef = useRef(false);
   const lastAutoRefreshAtRef = useRef(0);
@@ -174,8 +176,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const handleRefresh = useCallback(() => {
     pendingQuotaRefreshRef.current = true;
-    void triggerHeaderRefresh();
-  }, []);
+    void triggerHeaderRefresh(location.pathname);
+  }, [location.pathname]);
 
   const maybeAutoRefresh = useCallback(() => {
     if (disabled) return;

@@ -38,6 +38,11 @@ import {
 import { configApi, versionApi } from '@/services/api';
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 
+const TABLET_COLLAPSE_WIDTH = 1180;
+
+const shouldCollapseSidebar = () =>
+  typeof window !== 'undefined' && window.innerWidth <= TABLET_COLLAPSE_WIDTH;
+
 const sidebarIcons: Record<string, ReactNode> = {
   dashboard: <IconLayoutDashboard size={18} />,
   settings: <IconSlidersHorizontal size={18} />,
@@ -196,7 +201,7 @@ export function MainLayout() {
   const toggleLanguage = useLanguageStore((state) => state.toggleLanguage);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(shouldCollapseSidebar);
   const [checkingVersion, setCheckingVersion] = useState(false);
   const [brandExpanded, setBrandExpanded] = useState(true);
   const [requestLogModalOpen, setRequestLogModalOpen] = useState(false);
@@ -270,6 +275,27 @@ export function MainLayout() {
         clearTimeout(versionTapTimer.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia(`(max-width: ${TABLET_COLLAPSE_WIDTH}px)`);
+    const applyResponsiveSidebar = (matches: boolean) => {
+      setSidebarCollapsed(matches);
+      if (!matches) {
+        setSidebarOpen(false);
+      }
+    };
+
+    applyResponsiveSidebar(mediaQuery.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      applyResponsiveSidebar(event.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   const handleBrandClick = useCallback(() => {
@@ -387,7 +413,7 @@ export function MainLayout() {
     clearCache();
     const results = await Promise.allSettled([
       fetchConfig(undefined, true),
-      triggerHeaderRefresh()
+      triggerHeaderRefresh(location.pathname)
     ]);
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected && rejected.status === 'rejected') {
@@ -490,6 +516,7 @@ export function MainLayout() {
               {headerIcons.refresh}
             </Button>
             <Button
+              className="desktop-preferred"
               variant="ghost"
               size="sm"
               onClick={handleVersionCheck}
@@ -498,7 +525,7 @@ export function MainLayout() {
             >
               {headerIcons.update}
             </Button>
-            <Button variant="ghost" size="sm" onClick={toggleLanguage} title={t('language.switch')}>
+            <Button className="desktop-preferred" variant="ghost" size="sm" onClick={toggleLanguage} title={t('language.switch')}>
               {headerIcons.language}
             </Button>
             <Button variant="ghost" size="sm" onClick={cycleTheme} title={t('theme.switch')}>

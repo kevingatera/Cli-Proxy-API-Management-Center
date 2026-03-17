@@ -4,6 +4,7 @@ import { AutocompleteInput } from '@/components/ui/AutocompleteInput';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useAuthStore, useConfigStore, useNotificationStore, useModelsStore } from '@/stores';
 import { apiKeysApi } from '@/services/api/apiKeys';
 import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
@@ -12,6 +13,37 @@ import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import styles from './SystemPage.module.scss';
 
 const SYSTEM_MODEL_TEST_TIMEOUT_MS = 30_000;
+const SMOKE_TEST_VARIANTS = ['', 'fast', 'minimal', 'low', 'medium', 'high', 'xhigh', 'auto', 'none'];
+
+const splitSmokeTestModel = (value: string): { model: string; variant: string } => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return { model: '', variant: '' };
+  }
+
+  const lastSlash = trimmed.lastIndexOf('/');
+  if (lastSlash <= 0 || lastSlash === trimmed.length - 1) {
+    return { model: trimmed, variant: '' };
+  }
+
+  const tail = trimmed.slice(lastSlash + 1).trim().toLowerCase();
+  if (!SMOKE_TEST_VARIANTS.includes(tail)) {
+    return { model: trimmed, variant: '' };
+  }
+
+  return {
+    model: trimmed.slice(0, lastSlash).trim(),
+    variant: tail,
+  };
+};
+
+const buildSmokeTestModel = (model: string, variant: string): string => {
+  const trimmedModel = String(model || '').trim();
+  const trimmedVariant = String(variant || '').trim();
+  if (!trimmedModel) return '';
+  if (!trimmedVariant) return trimmedModel;
+  return `${trimmedModel}/${trimmedVariant}`;
+};
 
 const normalizeProxyBaseUrl = (baseUrl: string): string => {
   let normalized = String(baseUrl || '').trim();
@@ -83,6 +115,7 @@ export function SystemPage() {
 
   const [modelStatus, setModelStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'muted'; message: string }>();
   const [smokeTestModel, setSmokeTestModel] = useState('');
+  const [smokeTestVariant, setSmokeTestVariant] = useState('');
   const [smokeTestPrompt, setSmokeTestPrompt] = useState(() => 'Reply with OK only.');
   const [smokeTestRunning, setSmokeTestRunning] = useState(false);
   const [smokeTestStatus, setSmokeTestStatus] = useState<{
@@ -102,7 +135,7 @@ export function SystemPage() {
     [i18n.language]
   );
   const groupedModels = useMemo(() => classifyModels(models, { otherLabel }), [models, otherLabel]);
-  const modelOptions = useMemo(() => models.map((model) => model.name).filter(Boolean), [models]);
+  const modelOptions = useMemo(() => Array.from(new Set(models.map((model) => model.name).filter(Boolean))).sort(), [models]);
   const preferredSmokeTestModel = useMemo(() => {
     const names = new Set(modelOptions);
     if (names.has('gpt-5.4')) return 'gpt-5.4/fast';
@@ -192,7 +225,7 @@ export function SystemPage() {
       return;
     }
 
-    const modelName = smokeTestModel.trim();
+    const modelName = buildSmokeTestModel(smokeTestModel, smokeTestVariant);
     if (!modelName) {
       const message = t('system_info.smoke_test_model_required');
       setSmokeTestStatus({ type: 'error', message });
@@ -289,6 +322,7 @@ export function SystemPage() {
     showNotification,
     smokeTestModel,
     smokeTestPrompt,
+    smokeTestVariant,
     t,
   ]);
 
@@ -296,8 +330,12 @@ export function SystemPage() {
     showConfirmation({
       title: t('system_info.clear_login_title', { defaultValue: 'Clear Login Storage' }),
       message: t('system_info.clear_login_confirm'),
+      details: [
+        t('system_info.clear_login_detail_credentials'),
+        t('system_info.clear_login_detail_reconnect'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('system_info.clear_login_button'),
       onConfirm: () => {
         auth.logout();
         if (typeof localStorage === 'undefined') return;
@@ -319,18 +357,30 @@ export function SystemPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.connectionStatus, auth.apiBase]);
 
+  useHeaderRefresh(async () => {
+    await fetchConfig(undefined, true);
+    await fetchModels({ forceRefresh: true });
+  });
+
   useEffect(() => {
     if (smokeTestModel.trim()) {
       return;
     }
     if (preferredSmokeTestModel) {
-      setSmokeTestModel(preferredSmokeTestModel);
+      const parsed = splitSmokeTestModel(preferredSmokeTestModel);
+      setSmokeTestModel(parsed.model);
+      setSmokeTestVariant(parsed.variant);
     }
   }, [preferredSmokeTestModel, smokeTestModel]);
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('system_info.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('system_info.title')}</h1>
+          <p className="page-description">{t('system_info.description')}</p>
+        </div>
+      </div>
       <div className={styles.content}>
       <Card
         title={t('system_info.connection_status_title')}
@@ -465,14 +515,33 @@ export function SystemPage() {
       <Card title={t('system_info.smoke_test_title')}>
         <p className={styles.sectionDescription}>{t('system_info.smoke_test_desc')}</p>
         <div className={styles.smokeTestGrid}>
-          <AutocompleteInput
-            label={t('system_info.smoke_test_model_label')}
-            value={smokeTestModel}
-            onChange={setSmokeTestModel}
-            options={modelOptions}
-            placeholder={t('system_info.smoke_test_model_placeholder')}
-            hint={t('system_info.smoke_test_model_hint')}
-          />
+          <div className={styles.smokeTestModelRow}>
+            <AutocompleteInput
+              label={t('system_info.smoke_test_model_label')}
+              value={smokeTestModel}
+              onChange={setSmokeTestModel}
+              options={modelOptions}
+              placeholder={t('system_info.smoke_test_model_placeholder')}
+              hint={t('system_info.smoke_test_model_hint')}
+              wrapperClassName={styles.smokeTestModelInput}
+            />
+            <div className={`form-group ${styles.smokeTestVariantField}`}>
+              <label>{t('system_info.smoke_test_variant_label')}</label>
+              <select
+                className={styles.smokeTestVariantSelect}
+                value={smokeTestVariant}
+                onChange={(event) => setSmokeTestVariant(event.target.value)}
+              >
+                <option value="">{t('system_info.smoke_test_variant_default')}</option>
+                {SMOKE_TEST_VARIANTS.filter((variant) => variant).map((variant) => (
+                  <option key={variant} value={variant}>
+                    {variant}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">{t('system_info.smoke_test_variant_hint')}</div>
+            </div>
+          </div>
           <div className="form-group">
             <label>{t('system_info.smoke_test_prompt_label')}</label>
             <textarea

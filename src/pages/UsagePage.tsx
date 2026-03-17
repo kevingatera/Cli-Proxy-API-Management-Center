@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { useThemeStore } from '@/stores';
 import {
   StatCards,
@@ -29,6 +30,46 @@ import {
 } from '@/components/usage';
 import { getModelNamesFromUsage, getApiStats, getModelStats } from '@/utils/usage';
 import styles from './UsagePage.module.scss';
+
+const USAGE_VIEW_STATE_KEY = 'cliproxy-usage-view-v1';
+type ChartPeriod = 'hour' | 'day';
+
+const loadUsageViewState = (): {
+  chartLines: string[];
+  requestsPeriod: ChartPeriod;
+  tokensPeriod: ChartPeriod;
+} => {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+    }
+    const raw = localStorage.getItem(USAGE_VIEW_STATE_KEY);
+    if (!raw) {
+      return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+    }
+    const parsed = JSON.parse(raw) as {
+      chartLines?: string[];
+      requestsPeriod?: ChartPeriod;
+      tokensPeriod?: ChartPeriod;
+    };
+    return {
+      chartLines: Array.isArray(parsed.chartLines) && parsed.chartLines.length ? parsed.chartLines : ['all'],
+      requestsPeriod: parsed.requestsPeriod === 'hour' ? 'hour' : 'day',
+      tokensPeriod: parsed.tokensPeriod === 'hour' ? 'hour' : 'day',
+    };
+  } catch {
+    return { chartLines: ['all'], requestsPeriod: 'day', tokensPeriod: 'day' };
+  }
+};
+
+const clearUsageViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(USAGE_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
+  }
+};
 
 // Register Chart.js components
 ChartJS.register(
@@ -47,6 +88,7 @@ export function UsagePage() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
+  const savedViewState = useMemo(() => loadUsageViewState(), []);
 
   // Data hook
   const {
@@ -67,7 +109,7 @@ export function UsagePage() {
   useHeaderRefresh(loadUsage);
 
   // Chart lines state
-  const [chartLines, setChartLines] = useState<string[]>(['all']);
+  const [chartLines, setChartLines] = useState<string[]>(savedViewState.chartLines);
   const MAX_CHART_LINES = 9;
 
   // Sparklines hook
@@ -91,6 +133,25 @@ export function UsagePage() {
     tokensChartOptions
   } = useChartData({ usage, chartLines, isDark, isMobile });
 
+  const applyViewState = useCallback((value: {
+    chartLines?: string[];
+    requestsPeriod?: ChartPeriod;
+    tokensPeriod?: ChartPeriod;
+  }) => {
+    if (Array.isArray(value.chartLines) && value.chartLines.length) {
+      setChartLines(value.chartLines);
+    }
+    setRequestsPeriod(value.requestsPeriod === 'hour' ? 'hour' : 'day');
+    setTokensPeriod(value.tokensPeriod === 'hour' ? 'hour' : 'day');
+  }, [setRequestsPeriod, setTokensPeriod]);
+
+  useServerPreferenceSync(
+    'usage-view',
+    { chartLines, requestsPeriod, tokensPeriod },
+    applyViewState,
+    { readLegacy: loadUsageViewState, clearLegacy: clearUsageViewState }
+  );
+
   // Derived data
   const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
   const apiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
@@ -98,7 +159,7 @@ export function UsagePage() {
   const hasPrices = Object.keys(modelPrices).length > 0;
 
   return (
-    <div className={styles.container}>
+    <div className={`page-shell ${styles.container}`}>
       {loading && !usage && (
         <div className={styles.loadingOverlay} aria-busy="true">
           <div className={styles.loadingOverlayContent}>
@@ -108,9 +169,12 @@ export function UsagePage() {
         </div>
       )}
 
-      <div className={styles.header}>
-        <h1 className={styles.pageTitle}>{t('usage_stats.title')}</h1>
-        <div className={styles.headerActions}>
+      <div className={`page-header ${styles.header}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('usage_stats.title')}</h1>
+          <p className="page-description">{t('usage_stats.description')}</p>
+        </div>
+        <div className={`page-actions ${styles.headerActions}`}>
           <Button
             variant="secondary"
             size="sm"

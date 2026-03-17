@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useServerPreferenceSync } from '@/hooks/useServerPreferenceSync';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -98,6 +99,39 @@ const OAUTH_PROVIDER_EXCLUDES = new Set(['all', 'unknown', 'empty']);
 const MIN_CARD_PAGE_SIZE = 3;
 const MAX_CARD_PAGE_SIZE = 30;
 const MAX_AUTH_FILE_SIZE = 50 * 1024;
+const AUTH_FILES_VIEW_STATE_KEY = 'cliproxy-auth-files-view-v1';
+
+const loadAuthFilesViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return { filter: 'all', search: '', pageSize: 9 };
+    }
+    const raw = localStorage.getItem(AUTH_FILES_VIEW_STATE_KEY);
+    if (!raw) {
+      return { filter: 'all', search: '', pageSize: 9 };
+    }
+    const parsed = JSON.parse(raw) as { filter?: string; search?: string; pageSize?: number };
+    return {
+      filter: typeof parsed.filter === 'string' && parsed.filter.trim() ? parsed.filter : 'all',
+      search: typeof parsed.search === 'string' ? parsed.search : '',
+      pageSize:
+        typeof parsed.pageSize === 'number' && Number.isFinite(parsed.pageSize)
+          ? clampCardPageSize(parsed.pageSize)
+          : 9,
+    };
+  } catch {
+    return { filter: 'all', search: '', pageSize: 9 };
+  }
+};
+
+const clearAuthFilesViewState = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(AUTH_FILES_VIEW_STATE_KEY);
+  } catch {
+    // ignore cleanup failures
+  }
+};
 
 const clampCardPageSize = (value: number) =>
   Math.min(MAX_CARD_PAGE_SIZE, Math.max(MIN_CARD_PAGE_SIZE, Math.round(value)));
@@ -201,15 +235,17 @@ export function AuthFilesPage() {
   const [files, setFiles] = useState<AuthFileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | string>('all');
-  const [search, setSearch] = useState('');
+  const savedViewState = useRef(loadAuthFilesViewState());
+  const [filter, setFilter] = useState<'all' | string>(savedViewState.current.filter);
+  const [search, setSearch] = useState(savedViewState.current.search);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
-  const [pageSizeInput, setPageSizeInput] = useState('9');
+  const [pageSize, setPageSize] = useState(savedViewState.current.pageSize);
+  const [pageSizeInput, setPageSizeInput] = useState(String(savedViewState.current.pageSize));
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
+  const [operationMessage, setOperationMessage] = useState('');
   const [keyStats, setKeyStats] = useState<KeyStats>({ bySource: {}, byAuthIndex: {} });
   const [usageDetails, setUsageDetails] = useState<UsageDetail[]>([]);
 
@@ -266,6 +302,28 @@ export function AuthFilesPage() {
   useEffect(() => {
     setPageSizeInput(String(pageSize));
   }, [pageSize]);
+
+  const applyViewState = useCallback((value: { filter?: string; search?: string; pageSize?: number }) => {
+    if (typeof value.filter === 'string' && value.filter.trim()) {
+      setFilter(value.filter);
+    }
+    if (typeof value.search === 'string') {
+      setSearch(value.search);
+    }
+    if (typeof value.pageSize === 'number' && Number.isFinite(value.pageSize)) {
+      const nextPageSize = clampCardPageSize(value.pageSize);
+      setPageSize(nextPageSize);
+      setPageSizeInput(String(nextPageSize));
+    }
+    setPage(1);
+  }, []);
+
+  useServerPreferenceSync(
+    'auth-files-view',
+    { filter, search, pageSize },
+    applyViewState,
+    { readLegacy: loadAuthFilesViewState, clearLegacy: clearAuthFilesViewState }
+  );
 
   // 模型定义缓存（按 channel 缓存）
   const modelDefinitionsCacheRef = useRef<Map<string, AuthFileModelItem[]>>(new Map());
@@ -679,6 +737,7 @@ export function AuthFilesPage() {
     }
 
     setUploading(true);
+    setOperationMessage(t('auth_files.upload_progress', { current: 0, total: validFiles.length }));
     let successCount = 0;
     const failed: { name: string; message: string }[] = [];
 
@@ -686,6 +745,7 @@ export function AuthFilesPage() {
       try {
         await authFilesApi.upload(file);
         successCount++;
+        setOperationMessage(t('auth_files.upload_progress', { current: successCount, total: validFiles.length }));
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         failed.push({ name: file.name, message: errorMessage });
@@ -708,6 +768,7 @@ export function AuthFilesPage() {
     }
 
     setUploading(false);
+    setOperationMessage('');
     event.target.value = '';
   };
 
@@ -716,17 +777,23 @@ export function AuthFilesPage() {
     showConfirmation({
       title: t('auth_files.delete_title', { defaultValue: 'Delete File' }),
       message: `${t('auth_files.delete_confirm')} "${name}" ?`,
+      details: [
+        t('auth_files.delete_file_detail_name', { name }),
+        t('auth_files.delete_file_detail_irreversible'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('common.delete'),
       onConfirm: async () => {
         setDeleting(name);
+        const previousFiles = files;
+        setFiles((prev) => prev.filter((item) => item.name !== name));
         try {
           await authFilesApi.deleteFile(name);
           showNotification(t('auth_files.delete_success'), 'success');
-          setFiles((prev) => prev.filter((item) => item.name !== name));
         } catch (err: unknown) {
+          setFiles(previousFiles);
           const errorMessage = err instanceof Error ? err.message : '';
-          showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
+          showNotification(`${t('notification.delete_failed')}: ${errorMessage}. ${t('common.reverted', { defaultValue: 'Changes reverted.' })}`, 'error');
         } finally {
           setDeleting(null);
         }
@@ -745,10 +812,15 @@ export function AuthFilesPage() {
     showConfirmation({
       title: t('auth_files.delete_all_title', { defaultValue: 'Delete All Files' }),
       message: confirmMessage,
+      details: [
+        t('auth_files.delete_all_detail_scope', { count: files.filter((file) => !isRuntimeOnlyAuthFile(file) && (filter === 'all' || file.type === filter)).length }),
+        t('auth_files.delete_all_detail_runtime'),
+      ],
       variant: 'danger',
-      confirmText: t('common.confirm'),
+      confirmText: t('auth_files.delete_all_title', { defaultValue: 'Delete All Files' }),
       onConfirm: async () => {
         setDeletingAll(true);
+        setOperationMessage(t('auth_files.delete_progress', { current: 0, total: files.filter((file) => !isRuntimeOnlyAuthFile(file) && (filter === 'all' || file.type === filter)).length }));
         try {
           if (!isFiltered) {
             // 删除全部
@@ -768,14 +840,17 @@ export function AuthFilesPage() {
             let success = 0;
             let failed = 0;
             const deletedNames: string[] = [];
+            const total = filesToDelete.length;
 
             for (const file of filesToDelete) {
               try {
                 await authFilesApi.deleteFile(file.name);
                 success++;
                 deletedNames.push(file.name);
+                setOperationMessage(t('auth_files.delete_progress', { current: success + failed, total }));
               } catch {
                 failed++;
+                setOperationMessage(t('auth_files.delete_progress', { current: success + failed, total }));
               }
             }
 
@@ -799,6 +874,7 @@ export function AuthFilesPage() {
           showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
         } finally {
           setDeletingAll(false);
+          setOperationMessage('');
         }
       },
     });
@@ -1491,10 +1567,12 @@ export function AuthFilesPage() {
   );
 
   return (
-    <div className={styles.container}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{t('auth_files.title')}</h1>
-        <p className={styles.description}>{t('auth_files.description')}</p>
+    <div className={`page-shell ${styles.container}`}>
+      <div className={`page-header ${styles.pageHeader}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('auth_files.title')}</h1>
+          <p className="page-description">{t('auth_files.description')}</p>
+        </div>
       </div>
 
       <Card
@@ -1535,6 +1613,7 @@ export function AuthFilesPage() {
         }
       >
         {error && <div className={styles.errorBox}>{error}</div>}
+        {operationMessage && <div className={`status-badge warning ${styles.operationBanner}`}>{operationMessage}</div>}
 
         {/* 筛选区域 */}
         <div className={styles.filterSection}>

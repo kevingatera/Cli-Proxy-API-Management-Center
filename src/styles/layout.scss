@@ -1,4 +1,5 @@
 @use './variables.scss' as *;
+@use './mixins.scss' as *;
 
 :root {
   --header-height: 64px;
@@ -25,14 +26,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: $spacing-md;
-  padding: $spacing-md $spacing-lg;
+  gap: 12px;
+  padding: 12px 20px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 10;
   width: 100%;
+
+  @include tablet {
+    padding: 12px 16px;
+  }
 
   @media (max-width: $breakpoint-mobile) {
     position: fixed;
@@ -50,8 +55,8 @@
     flex: 0 1 auto;
 
     .brand-logo {
-      height: 32px;
-      width: 32px;
+      height: 28px;
+      width: 28px;
       object-fit: contain;
       flex-shrink: 0;
       border-radius: $radius-sm;
@@ -61,10 +66,14 @@
   .right {
     display: flex;
     align-items: center;
-    gap: $spacing-md;
+    gap: 12px;
     min-width: 0;
     flex: 1 1 auto;
     justify-content: flex-end;
+
+    @include tablet {
+      gap: 8px;
+    }
 
     @media (max-width: $breakpoint-mobile) {
       flex: 0 1 auto;
@@ -105,9 +114,9 @@
     align-items: center;
     gap: $spacing-xs;
     font-weight: 800;
-    font-size: 18px;
+    font-size: 17px;
     color: var(--text-primary);
-    margin-right: $spacing-md;
+    margin-right: 12px;
     cursor: pointer;
     overflow: hidden;
     white-space: nowrap;
@@ -187,8 +196,14 @@
   .header-actions {
     display: flex;
     align-items: center;
-    gap: $spacing-xs;
+    gap: 4px;
     flex-shrink: 0;
+
+    :global(.btn.btn-sm) {
+      min-width: 34px;
+      min-height: 34px;
+      padding: 0 10px;
+    }
 
     svg {
       display: block;
@@ -196,13 +211,17 @@
 
     @media (max-width: $breakpoint-mobile) {
       gap: 2px;
+
+      .desktop-preferred {
+        display: none;
+      }
     }
   }
 
   .connection {
     display: flex;
     align-items: center;
-    gap: $spacing-sm;
+    gap: 10px;
     color: var(--text-secondary);
     min-width: 0;
     flex-shrink: 1;
@@ -216,11 +235,19 @@
 
     .base {
       font-weight: 600;
+      font-size: 13px;
       color: var(--text-primary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 80px;
+      min-width: 0;
+      max-width: 28ch;
+    }
+
+    @include tablet {
+      .base {
+        max-width: 18ch;
+      }
     }
 
     @media (max-width: $breakpoint-mobile) {
@@ -364,11 +391,16 @@
 
 .main-content {
   flex: 1 0 auto;
-  padding: $spacing-lg;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: $spacing-lg;
   overflow-x: hidden;
+
+  @include tablet {
+    padding: 18px;
+    gap: 20px;
+  }
 
   &.main-content-logs {
     flex: 1 1 auto;
@@ -388,16 +420,25 @@
 }
 
 .footer {
-  padding: $spacing-md $spacing-lg;
+  padding: 10px 20px;
   border-top: 1px solid var(--border-color);
   background: var(--bg-primary);
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 12px;
   flex-wrap: wrap;
-  gap: $spacing-sm;
+  gap: 6px 18px;
+
+  > span {
+    line-height: 1.5;
+  }
+
+  @include tablet {
+    padding: 10px 18px;
+    gap: 6px 12px;
+  }
 
   .footer-version {
     user-select: none;
@@ -415,6 +456,11 @@
   background: var(--bg-secondary);
   padding: $spacing-lg;
 
+  @media (max-width: $breakpoint-mobile) {
+    align-items: flex-start;
+    padding: $spacing-md;
+  }
+
   .login-card {
     width: 100%;
     max-width: 520px;
@@ -426,6 +472,14 @@
     display: flex;
     flex-direction: column;
     gap: $spacing-lg;
+
+    @media (max-width: $breakpoint-mobile) {
+      max-width: none;
+      max-height: calc(100vh - #{$spacing-md * 2});
+      overflow: auto;
+      padding: $spacing-lg;
+      gap: $spacing-md;
+    }
   }
 
   .login-header {
@@ -438,10 +492,22 @@
       font-size: 22px;
       font-weight: 800;
       color: var(--text-primary);
+
+      @media (max-width: $breakpoint-mobile) {
+        font-size: 18px;
+      }
     }
 
     .subtitle {
       color: var(--text-secondary);
+
+      @media (max-width: $breakpoint-mobile) {
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: $breakpoint-mobile) {
+      text-align: left;
     }
   }
 
@@ -451,6 +517,11 @@
     justify-content: center;
     gap: $spacing-sm;
     flex-wrap: wrap;
+
+    @media (max-width: $breakpoint-mobile) {
+      justify-content: space-between;
+      align-items: flex-start;
+    }
   }
 
   .login-language-btn {
@@ -474,11 +545,21 @@
     .value {
       font-weight: 700;
       color: var(--text-primary);
+      word-break: break-word;
     }
 
     .item-actions {
       display: flex;
       gap: $spacing-md;
+    }
+
+    @media (max-width: $breakpoint-mobile) {
+      padding: $spacing-sm $spacing-md;
+
+      .label,
+      .hint {
+        font-size: 13px;
+      }
     }
   }
 
@@ -489,6 +570,7 @@
     gap: $spacing-xs;
     color: var(--text-secondary);
     cursor: pointer;
+    flex-wrap: wrap;
   }
 
   .error-box {

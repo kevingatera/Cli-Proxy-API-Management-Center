@@ -8,9 +8,7 @@
 }
 
 .pageHeader {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
+  width: 100%;
 }
 
 .pageTitle {
@@ -30,6 +28,10 @@
   display: flex;
   gap: $spacing-sm;
   flex-wrap: wrap;
+
+  @include tablet {
+    width: 100%;
+  }
 }
 
 .titleWrapper {
@@ -47,6 +49,7 @@
   min-width: 24px;
   padding: 0 8px;
   border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
   font-size: 13px;
   font-weight: 600;
   color: var(--count-badge-text);
@@ -56,11 +59,15 @@
 
 .errorBox {
   padding: $spacing-md;
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--danger-color);
+  background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: $radius-md;
-  color: var(--danger-color);
+  color: var(--error-text);
   font-size: 14px;
+  margin-bottom: $spacing-md;
+}
+
+.operationBanner {
   margin-bottom: $spacing-md;
 }
 
@@ -80,28 +87,42 @@
 
 .filterTag {
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: $radius-md;
   font-size: 13px;
   font-weight: 500;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   cursor: pointer;
-  transition: all $transition-fast;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: $shadow-sm;
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
   }
 }
 
 .filterTagActive {
   font-weight: 600;
+  background: var(--bg-secondary);
+  border-color: var(--primary-color);
+  color: var(--text-primary);
 }
 
 .filterControls {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
   gap: $spacing-md;
-  flex-wrap: wrap;
   align-items: flex-end;
+  padding: $spacing-md;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background: var(--bg-primary);
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
 
   // 修复 Input 组件在 filterItem 中的嵌套样式
   :global(.form-group) {
@@ -129,8 +150,7 @@
   // 搜索输入框需要更宽以显示完整的 placeholder
   &:first-child {
     min-width: 220px;
-    flex: 1;
-    max-width: 320px;
+    max-width: none;
   }
 
   // 其他 filterItem 保持较小的宽度
@@ -146,13 +166,14 @@
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
-  cursor: text;
+  cursor: pointer;
   height: 38px;
   box-sizing: border-box;
 
   &:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   }
 }
 
@@ -160,10 +181,10 @@
 .fileGrid {
   display: grid;
   gap: $spacing-md;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 
   @include tablet {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
 
   @include mobile {
@@ -434,14 +455,10 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
-  transition:
-    transform $transition-fast,
-    box-shadow $transition-fast,
-    border-color $transition-fast;
+  transition: border-color $transition-fast, background-color $transition-fast;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: $shadow-md;
+    background: var(--bg-quinary);
     border-color: rgba(37, 99, 235, 0.2);
   }
 }
@@ -465,7 +482,8 @@
 
 .typeBadge {
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: $radius-full;
+  border: 1px solid transparent;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -581,7 +599,7 @@
   font-weight: 600;
   white-space: nowrap;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: $radius-md;
   background: var(--bg-tertiary);
 }
 
@@ -591,13 +609,13 @@
 }
 
 .statusRateMedium {
-  color: var(--warning-text, #92400e);
-  background: var(--warning-bg, #fef3c7);
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .statusRateLow {
-  color: var(--failure-badge-text, #991b1b);
-  background: var(--failure-badge-bg, #fee2e2);
+  color: var(--error-text);
+  background: var(--error-bg);
 }
 
 .prefixProxyEditor {
@@ -621,9 +639,9 @@
 .prefixProxyError {
   padding: $spacing-sm $spacing-md;
   border-radius: $radius-md;
-  border: 1px solid var(--danger-color);
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--danger-color);
+  border: 1px solid var(--error-border);
+  background-color: var(--error-bg);
+  color: var(--error-text);
   font-size: 12px;
 }
 

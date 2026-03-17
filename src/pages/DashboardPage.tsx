@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Card } from '@/components/ui/Card';
 import {
   IconKey,
   IconBot,
@@ -213,10 +214,12 @@ export function DashboardPage() {
   ];
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('dashboard.title')}</h1>
-        <p className={styles.subtitle}>{t('dashboard.subtitle')}</p>
+    <div className={`page-shell ${styles.dashboard}`}>
+      <div className={`page-header ${styles.header}`}>
+        <div className="page-heading">
+          <h1 className="page-title">{t('dashboard.title')}</h1>
+          <p className="page-description">{t('dashboard.subtitle')}</p>
+        </div>
       </div>
 
       <div className={styles.connectionCard}>
@@ -271,8 +274,16 @@ export function DashboardPage() {
       </div>
 
       {config && (
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t('dashboard.current_config')}</h2>
+        <Card
+          className={styles.sectionCard}
+          title={t('dashboard.current_config')}
+          extra={
+            <Link to="/settings" className={styles.viewMoreLink}>
+              {t('dashboard.edit_settings')} →
+            </Link>
+          }
+        >
+          <div className={styles.section}>
           <div className={styles.configGrid}>
             <div className={styles.configItem}>
               <span className={styles.configLabel}>{t('basic_settings.debug_enable')}</span>
@@ -309,10 +320,8 @@ export function DashboardPage() {
               </div>
             )}
           </div>
-          <Link to="/settings" className={styles.viewMoreLink}>
-            {t('dashboard.edit_settings')} →
-          </Link>
-        </div>
+          </div>
+        </Card>
       )}
     </div>
   );

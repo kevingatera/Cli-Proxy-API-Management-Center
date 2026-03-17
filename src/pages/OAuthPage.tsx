@@ -299,8 +299,12 @@ export function OAuthPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('nav.oauth', { defaultValue: 'OAuth' })}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('nav.oauth', { defaultValue: 'OAuth' })}</h1>
+        </div>
+      </div>
 
       <div className={styles.content}>
         {PROVIDERS.map((provider) => {

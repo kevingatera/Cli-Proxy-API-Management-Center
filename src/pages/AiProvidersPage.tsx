@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { entriesToModels } from '@/components/ui/ModelInputList';
 import {
@@ -20,6 +20,7 @@ import {
   withDisableAllModelsRule,
   withoutDisableAllModelsRule,
 } from '@/components/providers/utils';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { ampcodeApi, providersApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore, useThemeStore } from '@/stores';
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
@@ -53,6 +54,14 @@ export function AiProvidersPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isSwitching = Boolean(configSwitchingKey);
+
+  const progressMessage = useMemo(() => {
+    if (saving) return t('ai_providers.progress_saving');
+    if (isSwitching) return t('ai_providers.progress_switching');
+    if (ampcodeBusy) return t('ai_providers.progress_ampcode');
+    if (loading) return t('ai_providers.progress_loading');
+    return '';
+  }, [ampcodeBusy, isSwitching, loading, saving, t]);
 
   const { keyStats, usageDetails, loadKeyStats } = useProviderStats();
 
@@ -119,6 +128,10 @@ export function AiProvidersPage() {
     config?.vertexApiKeys,
     config?.openaiCompatibility,
   ]);
+
+  useHeaderRefresh(async () => {
+    await Promise.all([loadConfigs(), loadKeyStats()]);
+  });
 
   const closeModal = () => {
     setModal(null);
@@ -534,10 +547,16 @@ export function AiProvidersPage() {
   const openaiModalIndex = modal?.type === 'openai' ? modal.index : null;
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('ai_providers.title')}</h1>
+    <div className={`page-shell ${styles.container}`}>
+      <div className="page-header">
+        <div className="page-heading">
+          <h1 className="page-title">{t('ai_providers.title')}</h1>
+          <p className="page-description">{t('ai_providers.description')}</p>
+        </div>
+      </div>
       <div className={styles.content}>
         {error && <div className="error-box">{error}</div>}
+        {progressMessage && <div className={`status-badge warning ${styles.progressBanner}`}>{progressMessage}</div>}
 
         <GeminiSection
           configs={geminiKeys}

@@ -29,6 +29,10 @@
   gap: $spacing-xl;
 }
 
+.progressBanner {
+  margin-bottom: -$spacing-md;
+}
+
 .section {
   display: flex;
   flex-direction: column;
@@ -52,7 +56,7 @@
 .providerList {
   display: grid;
   gap: $spacing-md;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 
   @include mobile {
     grid-template-columns: 1fr;
@@ -132,9 +136,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--accent-tertiary, #f3f4f6);
+  background: var(--accent-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: 12px;
+  border-radius: $radius-md;
   padding: 4px 10px;
   font-size: 12px;
   color: var(--text-secondary);
@@ -170,10 +174,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--bg-quinary, #f8f9fa);
+  background: var(--bg-quinary);
   color: var(--text-secondary);
   border: 1px solid var(--border-secondary);
-  border-radius: 14px;
+  border-radius: $radius-md;
   padding: 4px 10px;
   font-size: 12px;
   transition: all 0.15s ease;
@@ -200,12 +204,12 @@
 
 // 排除模型标签（警告色）
 .excludedModelTag {
-  background: var(--warning-bg, #fef3c7);
-  border-color: var(--warning-border, #fbbf24);
-  color: var(--warning-text, #92400e);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 
   .modelName {
-    color: var(--warning-text, #92400e);
+    color: var(--warning-text);
   }
 }
 
@@ -217,7 +221,7 @@
 .excludedModelsLabel {
   font-size: 12px;
   font-weight: 500;
-  color: var(--warning-text, #92400e);
+  color: var(--warning-text);
   margin-bottom: 4px;
 }
 
@@ -245,9 +249,9 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--bg-secondary, #f9fafb);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-secondary);
-  border-radius: 8px;
+  border-radius: $radius-md;
   font-size: 12px;
 }
 
