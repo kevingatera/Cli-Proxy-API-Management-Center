@@ -120,10 +120,6 @@
   border-radius: $radius-lg;
   background: var(--bg-primary);
 
-  @include mobile {
-    grid-template-columns: 1fr;
-  }
-
   // 修复 Input 组件在 filterItem 中的嵌套样式
   :global(.form-group) {
     margin: 0;
@@ -132,6 +128,10 @@
   :global(.input) {
     height: 38px;
     box-sizing: border-box;
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
   }
 }
 
