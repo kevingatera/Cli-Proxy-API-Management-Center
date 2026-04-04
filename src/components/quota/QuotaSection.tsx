@@ -171,13 +171,21 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const location = useLocation();
 
   const pendingQuotaRefreshRef = useRef(false);
+  const pendingImmediateRefreshNamesRef = useRef<Set<string> | null>(null);
   const lastAutoRefreshAtRef = useRef(0);
   const prevFilesLoadingRef = useRef(loading);
 
   const handleRefresh = useCallback(() => {
+    const targets = filteredFiles;
+    if (targets.length > 0) {
+      pendingImmediateRefreshNamesRef.current = new Set(targets.map((item) => item.name));
+      void loadQuota(targets, 'all', setLoading);
+    } else {
+      pendingImmediateRefreshNamesRef.current = null;
+    }
     pendingQuotaRefreshRef.current = true;
     void triggerHeaderRefresh(location.pathname);
-  }, [location.pathname]);
+  }, [filteredFiles, loadQuota, location.pathname, setLoading]);
 
   const maybeAutoRefresh = useCallback(() => {
     if (disabled) return;
@@ -245,11 +253,18 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     if (!wasLoading) return;
 
     pendingQuotaRefreshRef.current = false;
-    const scope = effectiveViewMode === 'all' ? 'all' : 'page';
-    const targets = effectiveViewMode === 'all' ? filteredFiles : pageItems;
+    const pendingImmediateNames = pendingImmediateRefreshNamesRef.current;
+    pendingImmediateRefreshNamesRef.current = null;
+    const hasNewTargetsAfterHeaderRefresh = pendingImmediateNames
+      ? filteredFiles.some((item) => !pendingImmediateNames.has(item.name))
+      : true;
+    if (!hasNewTargetsAfterHeaderRefresh) return;
+
+    const scope = 'all';
+    const targets = filteredFiles;
     if (targets.length === 0) return;
-    loadQuota(targets, scope, setLoading);
-  }, [loading, effectiveViewMode, filteredFiles, pageItems, loadQuota, setLoading]);
+    void loadQuota(targets, scope, setLoading);
+  }, [loading, filteredFiles, loadQuota, setLoading]);
 
   useEffect(() => {
     if (loading) return;
