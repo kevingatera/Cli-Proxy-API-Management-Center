@@ -5,12 +5,17 @@ import { useNotificationStore } from '@/stores';
 import { usageApi } from '@/services/api/usage';
 import { clearModelPrices, loadModelPrices, saveModelPrices, type ModelPrice } from '@/utils/usage';
 import {
+  CURSOR_REMOTE_SYNC_INTERVAL_MS,
+  fetchBundledCursorPrices,
   OPENROUTER_REMOTE_SYNC_INTERVAL_MS,
   fetchBundledOpenRouterPrices,
+  fetchCursorLatestPrices,
   fetchOpenRouterLatestPrices,
   getUsedModelNames,
+  loadLastCursorRemoteSyncAt,
   loadLastOpenRouterRemoteSyncAt,
   mergeModelPricesForUsedModels,
+  saveLastCursorRemoteSyncAt,
   saveLastOpenRouterRemoteSyncAt,
 } from '@/utils/modelPrices';
 
@@ -210,6 +215,20 @@ export function useUsageData(): UseUsageDataReturn {
       }
 
       if (remainingMissing.length) {
+        try {
+          const bundledCursor = await fetchBundledCursorPrices();
+          const mergedBundledCursor = mergeModelPricesForUsedModels(nextPrices, bundledCursor, activeModelNames);
+          nextPrices = mergedBundledCursor.nextPrices;
+          remainingMissing = mergedBundledCursor.missingModels;
+          if (mergedBundledCursor.added > 0) {
+            handleSetModelPrices(nextPrices);
+          }
+        } catch {
+          // Ignore local cursor catalog errors and fall through to remote sync when needed.
+        }
+      }
+
+      if (remainingMissing.length) {
         const lastRemoteSync = loadLastOpenRouterRemoteSyncAt();
         if (Date.now() - lastRemoteSync >= OPENROUTER_REMOTE_SYNC_INTERVAL_MS) {
           try {
@@ -223,6 +242,24 @@ export function useUsageData(): UseUsageDataReturn {
             }
           } catch {
             // Keep current prices if remote sync fails.
+          }
+        }
+      }
+
+      if (remainingMissing.length) {
+        const lastCursorRemoteSync = loadLastCursorRemoteSyncAt();
+        if (Date.now() - lastCursorRemoteSync >= CURSOR_REMOTE_SYNC_INTERVAL_MS) {
+          try {
+            const remoteCursor = await fetchCursorLatestPrices();
+            const mergedRemoteCursor = mergeModelPricesForUsedModels(nextPrices, remoteCursor, activeModelNames);
+            nextPrices = mergedRemoteCursor.nextPrices;
+            remainingMissing = mergedRemoteCursor.missingModels;
+            saveLastCursorRemoteSyncAt(Date.now());
+            if (mergedRemoteCursor.added > 0) {
+              handleSetModelPrices(nextPrices);
+            }
+          } catch {
+            // Keep current prices if cursor remote sync fails.
           }
         }
       }

@@ -3,8 +3,12 @@ import { getModelNamesFromUsage, type ModelPrice } from './usage';
 const OPENROUTER_LOCAL_URL = '/model-prices/openrouter.json';
 const OPENROUTER_REMOTE_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_REMOTE_SYNC_STORAGE_KEY = 'cli-proxy-openrouter-prices-last-sync-v1';
+const CURSOR_LOCAL_URL = '/model-prices/cursor.json';
+const CURSOR_REMOTE_URLS = ['https://cursor.com/api/models', 'https://api2.cursor.sh/v0/models'];
+const CURSOR_REMOTE_SYNC_STORAGE_KEY = 'cli-proxy-cursor-prices-last-sync-v1';
 
 export const OPENROUTER_REMOTE_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+export const CURSOR_REMOTE_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const uniqueModelNames = (modelNames: string[]): string[] => {
   const seen = new Set<string>();
@@ -146,6 +150,14 @@ export const fetchBundledOpenRouterPrices = async (): Promise<Record<string, Mod
   return normalizeModelPricesPayload(await res.json());
 };
 
+export const fetchBundledCursorPrices = async (): Promise<Record<string, ModelPrice>> => {
+  const res = await fetch(CURSOR_LOCAL_URL, { cache: 'force-cache' });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return normalizeModelPricesPayload(await res.json());
+};
+
 export const fetchOpenRouterLatestPrices = async (): Promise<Record<string, ModelPrice>> => {
   const res = await fetch(OPENROUTER_REMOTE_URL, { cache: 'no-store' });
   if (!res.ok) {
@@ -176,6 +188,93 @@ export const fetchOpenRouterLatestPrices = async (): Promise<Record<string, Mode
   return prices;
 };
 
+const parseCursorPrice = (value: unknown): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  // Cursor/OpenRouter-like APIs often return per-token pricing.
+  return n > 0 && n <= 0.001 ? n * 1_000_000 : n;
+};
+
+const getCursorModelsPayload = (payload: unknown): Array<Record<string, unknown>> => {
+  if (Array.isArray(payload)) {
+    return payload.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>;
+  }
+  if (!payload || typeof payload !== 'object') return [];
+
+  const root = payload as Record<string, unknown>;
+  const candidates = [root.data, root.models, root.items];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>;
+    }
+  }
+  return [];
+};
+
+export const fetchCursorLatestPrices = async (): Promise<Record<string, ModelPrice>> => {
+  let lastError: unknown = null;
+
+  for (const url of CURSOR_REMOTE_URLS) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const models = getCursorModelsPayload(await res.json());
+      const prices: Record<string, ModelPrice> = {};
+
+      models.forEach((model) => {
+        const id = String(model.id ?? model.model ?? model.name ?? '').trim();
+        if (!id) return;
+
+        const pricingRaw = model.pricing;
+        const pricing =
+          pricingRaw && typeof pricingRaw === 'object' ? (pricingRaw as Record<string, unknown>) : null;
+        if (!pricing) return;
+
+        const prompt = parseCursorPrice(
+          pricing.prompt ??
+            pricing.input ??
+            pricing.input_cost ??
+            pricing.input_per_token ??
+            pricing.input_per_million
+        );
+        const completion = parseCursorPrice(
+          pricing.completion ??
+            pricing.output ??
+            pricing.output_cost ??
+            pricing.output_per_token ??
+            pricing.output_per_million
+        );
+        const cache = parseCursorPrice(
+          pricing.input_cache_read ??
+            pricing.cache ??
+            pricing.cache_read ??
+            pricing.cached_input ??
+            prompt
+        );
+
+        if (prompt <= 0 && completion <= 0 && cache <= 0) return;
+        prices[id] = {
+          prompt,
+          completion,
+          cache: cache > 0 ? cache : prompt,
+        };
+      });
+
+      return prices;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error('Cursor models fetch failed');
+};
+
 export const loadLastOpenRouterRemoteSyncAt = (): number => {
   try {
     if (typeof localStorage === 'undefined') return 0;
@@ -192,5 +291,24 @@ export const saveLastOpenRouterRemoteSyncAt = (timestamp: number): void => {
     localStorage.setItem(OPENROUTER_REMOTE_SYNC_STORAGE_KEY, String(timestamp));
   } catch {
     console.warn('failed to save OpenRouter pricing sync timestamp');
+  }
+};
+
+export const loadLastCursorRemoteSyncAt = (): number => {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const raw = Number(localStorage.getItem(CURSOR_REMOTE_SYNC_STORAGE_KEY) || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const saveLastCursorRemoteSyncAt = (timestamp: number): void => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(CURSOR_REMOTE_SYNC_STORAGE_KEY, String(timestamp));
+  } catch {
+    console.warn('failed to save Cursor pricing sync timestamp');
   }
 };
