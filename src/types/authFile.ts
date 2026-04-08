@@ -5,6 +5,7 @@
 
 export type AuthFileType =
   | 'qwen'
+  | 'cursor'
   | 'gemini'
   | 'gemini-cli'
   | 'aistudio'

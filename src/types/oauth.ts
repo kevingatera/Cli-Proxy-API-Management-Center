@@ -6,6 +6,7 @@
 // OAuth 提供商类型
 export type OAuthProvider =
   | 'codex'
+  | 'cursor'
   | 'anthropic'
   | 'antigravity'
   | 'gemini-cli'

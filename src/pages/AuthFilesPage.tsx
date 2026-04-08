@@ -66,6 +66,10 @@ const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#fff3e0', text: '#ef6c00' },
     dark: { bg: '#e65100', text: '#ffb74d' },
   },
+  cursor: {
+    light: { bg: '#ede7f6', text: '#4527a0' },
+    dark: { bg: '#311b92', text: '#b39ddb' },
+  },
   antigravity: {
     light: { bg: '#e0f7fa', text: '#006064' },
     dark: { bg: '#004d40', text: '#80deea' },
@@ -91,6 +95,7 @@ const OAUTH_PROVIDER_PRESETS = [
   'antigravity',
   'claude',
   'codex',
+  'cursor',
   'qwen',
   'iflow',
 ];

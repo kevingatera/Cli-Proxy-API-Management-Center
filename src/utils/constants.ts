@@ -40,6 +40,7 @@ export const NOTIFICATION_DURATION_MS = 3000;
 // OAuth 卡片 ID 列表
 export const OAUTH_CARD_IDS = [
   'codex-oauth-card',
+  'cursor-oauth-card',
   'anthropic-oauth-card',
   'antigravity-oauth-card',
   'gemini-cli-oauth-card',
@@ -47,6 +48,7 @@ export const OAUTH_CARD_IDS = [
 ];
 export const OAUTH_PROVIDERS = {
   CODEX: 'codex',
+  CURSOR: 'cursor',
   ANTHROPIC: 'anthropic',
   ANTIGRAVITY: 'antigravity',
   GEMINI_CLI: 'gemini-cli',
