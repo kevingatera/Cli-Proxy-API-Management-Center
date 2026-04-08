@@ -12,6 +12,7 @@ import {
   QuotaSection,
   ANTIGRAVITY_CONFIG,
   CODEX_CONFIG,
+  CURSOR_CONFIG,
   GEMINI_CLI_CONFIG
 } from '@/components/quota';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -273,6 +274,13 @@ export function QuotaPage() {
       />
       <QuotaSection
         config={CODEX_CONFIG}
+        files={files}
+        loading={loading}
+        disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
+      />
+      <QuotaSection
+        config={CURSOR_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}

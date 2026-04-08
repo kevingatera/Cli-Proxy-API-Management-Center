@@ -109,7 +109,7 @@ export function OAuthPage() {
       try {
         const res = await oauthApi.getAuthStatus(state);
         if (res.status === 'ok') {
-          updateProviderState(provider, { status: 'success', polling: false });
+          updateProviderState(provider, { status: 'success', polling: false, url: undefined, state: undefined });
           showNotification(t(getAuthKey(provider, 'oauth_status_success')), 'success');
           window.clearInterval(timer);
           delete timers.current[provider];
@@ -140,6 +140,8 @@ export function OAuthPage() {
     updateProviderState(provider, {
       status: 'waiting',
       polling: true,
+      url: undefined,
+      state: undefined,
       error: undefined,
       callbackStatus: undefined,
       callbackError: undefined,

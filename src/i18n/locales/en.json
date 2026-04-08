@@ -479,6 +479,22 @@
     "fetch_all": "Fetch All",
     "remaining_amount": "Remaining {{count}}"
   },
+  "cursor_quota": {
+    "title": "Cursor Usage",
+    "empty_title": "No Cursor Auth Files",
+    "empty_desc": "Upload a Cursor credential to view usage telemetry.",
+    "idle": "Not loaded. Click Refresh Button.",
+    "loading": "Loading usage...",
+    "load_failed": "Failed to load usage: {{message}}",
+    "missing_auth_index": "Auth file missing auth_index",
+    "empty_usage": "No usage telemetry yet for this credential.",
+    "refresh_button": "Refresh Usage",
+    "fetch_all": "Fetch All",
+    "telemetry_label": "Local telemetry",
+    "requests_value": "{{count}} requests",
+    "tokens_value": "{{count}} tokens",
+    "models_value": "{{count}} models"
+  },
   "vertex_import": {
     "title": "Vertex JSON Login",
     "description": "Upload a Google service account JSON to store it as auth-dir/vertex-<project>.json using the same rules as the CLI vertex-import helper.",
@@ -834,7 +850,7 @@
   },
   "quota_management": {
     "title": "Quota Management",
-    "description": "Monitor OAuth quota status for Antigravity, Codex, and Gemini CLI credentials.",
+    "description": "Monitor OAuth quota status for Antigravity/Codex/Gemini CLI and usage telemetry for Cursor credentials.",
     "refresh_files": "Refresh auth files",
     "refresh_files_and_quota": "Refresh files & quota",
     "last_updated": "Last updated: {{time}}",

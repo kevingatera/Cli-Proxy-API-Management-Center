@@ -14,11 +14,13 @@ import type {
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
+  CursorQuotaState,
+  CursorUsageSummary,
   GeminiCliParsedBucket,
   GeminiCliQuotaBucketState,
   GeminiCliQuotaState
 } from '@/types';
-import { apiCallApi, authFilesApi, getApiCallErrorMessage } from '@/services/api';
+import { apiCallApi, authFilesApi, getApiCallErrorMessage, usageApi } from '@/services/api';
 import {
   ANTIGRAVITY_QUOTA_URLS,
   ANTIGRAVITY_REQUEST_HEADERS,
@@ -45,6 +47,7 @@ import {
   getStatusFromError,
   isAntigravityFile,
   isCodexFile,
+  isCursorFile,
   isGeminiCliFile,
   isRuntimeOnlyAuthFile
 } from '@/utils/quota';
@@ -53,7 +56,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'codex' | 'gemini-cli';
+type QuotaType = 'antigravity' | 'codex' | 'gemini-cli' | 'cursor';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
 
@@ -61,15 +64,19 @@ export interface QuotaStore {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
+  cursorQuota: Record<string, CursorQuotaState>;
   antigravityQuotaLastUpdatedAt: number | null;
   codexQuotaLastUpdatedAt: number | null;
   geminiCliQuotaLastUpdatedAt: number | null;
+  cursorQuotaLastUpdatedAt: number | null;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
+  setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
   setAntigravityQuotaLastUpdatedAt: (timestamp: number | null) => void;
   setCodexQuotaLastUpdatedAt: (timestamp: number | null) => void;
   setGeminiCliQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setCursorQuotaLastUpdatedAt: (timestamp: number | null) => void;
   clearQuotaCache: () => void;
 }
 
@@ -367,6 +374,97 @@ const fetchGeminiCliQuota = async (
   return buildGeminiCliQuotaBuckets(parsedBuckets);
 };
 
+const emptyCursorSummary = (): CursorUsageSummary => ({
+  requests: 0,
+  successCount: 0,
+  failureCount: 0,
+  totalTokens: 0,
+  modelCount: 0
+});
+
+const parseTokenTotal = (tokens: unknown): number => {
+  if (!tokens || typeof tokens !== 'object') return 0;
+  const record = tokens as Record<string, unknown>;
+  const total =
+    normalizeNumberValue(record.total_tokens ?? record.totalTokens) ??
+    ((normalizeNumberValue(record.input_tokens ?? record.inputTokens) ?? 0) +
+      (normalizeNumberValue(record.output_tokens ?? record.outputTokens) ?? 0) +
+      (normalizeNumberValue(record.reasoning_tokens ?? record.reasoningTokens) ?? 0));
+  return Math.max(0, Math.round(total));
+};
+
+const parseTimestamp = (value: unknown): number | null => {
+  const ts = normalizeStringValue(value);
+  if (!ts) return null;
+  const millis = Date.parse(ts);
+  return Number.isFinite(millis) ? millis : null;
+};
+
+const fetchCursorQuota = async (file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
+  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
+  const authIndex = normalizeAuthIndexValue(rawAuthIndex);
+  if (!authIndex) {
+    throw new Error(t('cursor_quota.missing_auth_index'));
+  }
+
+  const response = await usageApi.getUsage();
+  const usageRoot = (response?.usage ?? response) as Record<string, unknown>;
+  const apis =
+    usageRoot && typeof usageRoot.apis === 'object' && usageRoot.apis !== null
+      ? (usageRoot.apis as Record<string, unknown>)
+      : {};
+
+  let requests = 0;
+  let successCount = 0;
+  let failureCount = 0;
+  let totalTokens = 0;
+  let lastSeenMillis: number | null = null;
+  const models = new Set<string>();
+
+  for (const apiValue of Object.values(apis)) {
+    if (!apiValue || typeof apiValue !== 'object') continue;
+    const modelsRecord = (apiValue as Record<string, unknown>).models;
+    if (!modelsRecord || typeof modelsRecord !== 'object') continue;
+
+    for (const [modelKey, modelValue] of Object.entries(modelsRecord as Record<string, unknown>)) {
+      if (!modelValue || typeof modelValue !== 'object') continue;
+      const details = (modelValue as Record<string, unknown>).details;
+      if (!Array.isArray(details)) continue;
+
+      let modelMatched = false;
+      for (const detailValue of details) {
+        if (!detailValue || typeof detailValue !== 'object') continue;
+        const detail = detailValue as Record<string, unknown>;
+        const detailAuthIndex = normalizeAuthIndexValue(detail.auth_index ?? detail.authIndex);
+        if (detailAuthIndex !== authIndex) continue;
+
+        modelMatched = true;
+        requests += 1;
+        const failed = Boolean(detail.failed);
+        if (failed) failureCount += 1;
+        else successCount += 1;
+        totalTokens += parseTokenTotal(detail.tokens);
+        const millis = parseTimestamp(detail.timestamp);
+        if (millis !== null && (lastSeenMillis === null || millis > lastSeenMillis)) {
+          lastSeenMillis = millis;
+        }
+      }
+      if (modelMatched) {
+        models.add(modelKey);
+      }
+    }
+  }
+
+  return {
+    requests,
+    successCount,
+    failureCount,
+    totalTokens,
+    modelCount: models.size,
+    lastSeenAt: lastSeenMillis !== null ? new Date(lastSeenMillis).toISOString() : undefined
+  };
+};
+
 const renderAntigravityItems = (
   quota: AntigravityQuotaState,
   t: TFunction,
@@ -542,6 +640,58 @@ const renderGeminiCliItems = (
   });
 };
 
+const renderCursorItems = (
+  quota: CursorQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap } = helpers;
+  const { createElement: h } = React;
+  const summary = quota.summary ?? emptyCursorSummary();
+
+  if (summary.requests <= 0) {
+    return h('div', { className: styleMap.quotaMessage }, t('cursor_quota.empty_usage'));
+  }
+
+  const successPct = summary.requests > 0 ? Math.round((summary.successCount / summary.requests) * 100) : 0;
+  const lastSeenLabel = summary.lastSeenAt ? formatQuotaResetTime(summary.lastSeenAt) : '-';
+
+  return h(
+    'div',
+    { className: styleMap.quotaRow },
+    h(
+      'div',
+      { className: styleMap.quotaRowHeader },
+      h('span', { className: styleMap.quotaModel }, t('cursor_quota.telemetry_label')),
+      h(
+        'div',
+        { className: styleMap.quotaMeta },
+        h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+        h('span', { className: styleMap.quotaReset }, lastSeenLabel)
+      )
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMeta },
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('cursor_quota.requests_value', { count: summary.requests })
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('cursor_quota.tokens_value', { count: summary.totalTokens })
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('cursor_quota.models_value', { count: summary.modelCount })
+      )
+    )
+  );
+};
+
 export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQuotaGroup[]> = {
   type: 'antigravity',
   i18nPrefix: 'antigravity_quota',
@@ -619,4 +769,28 @@ export const GEMINI_CLI_CONFIG: QuotaConfig<GeminiCliQuotaState, GeminiCliQuotaB
   controlClassName: styles.geminiCliControl,
   gridClassName: styles.geminiCliGrid,
   renderQuotaItems: renderGeminiCliItems
+};
+
+export const CURSOR_CONFIG: QuotaConfig<CursorQuotaState, CursorUsageSummary> = {
+  type: 'cursor',
+  i18nPrefix: 'cursor_quota',
+  filterFn: (file) => isCursorFile(file) && !isRuntimeOnlyAuthFile(file),
+  fetchQuota: fetchCursorQuota,
+  storeSelector: (state) => state.cursorQuota,
+  storeSetter: 'setCursorQuota',
+  storeLastUpdatedAtSelector: (state) => state.cursorQuotaLastUpdatedAt,
+  storeLastUpdatedAtSetter: 'setCursorQuotaLastUpdatedAt',
+  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildSuccessState: (summary) => ({ status: 'success', summary }),
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    summary: emptyCursorSummary(),
+    error: message,
+    errorStatus: status
+  }),
+  cardClassName: styles.codexCard,
+  controlsClassName: styles.codexControls,
+  controlClassName: styles.codexControl,
+  gridClassName: styles.codexGrid,
+  renderQuotaItems: renderCursorItems
 };

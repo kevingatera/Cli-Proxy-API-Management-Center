@@ -145,3 +145,19 @@ export interface CodexQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+export interface CursorUsageSummary {
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  modelCount: number;
+  lastSeenAt?: string;
+}
+
+export interface CursorQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  summary: CursorUsageSummary;
+  error?: string;
+  errorStatus?: number;
+}

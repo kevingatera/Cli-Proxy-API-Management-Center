@@ -479,6 +479,22 @@
     "fetch_all": "获取全部",
     "remaining_amount": "剩余 {{count}}"
   },
+  "cursor_quota": {
+    "title": "Cursor 用量",
+    "empty_title": "暂无 Cursor 认证",
+    "empty_desc": "上传 Cursor 认证文件后即可查看用量遥测。",
+    "idle": "尚未加载用量，请点击刷新按钮。",
+    "loading": "正在加载用量...",
+    "load_failed": "用量获取失败：{{message}}",
+    "missing_auth_index": "认证文件缺少 auth_index",
+    "empty_usage": "该凭证暂时还没有用量遥测数据。",
+    "refresh_button": "刷新用量",
+    "fetch_all": "获取全部",
+    "telemetry_label": "本地遥测",
+    "requests_value": "{{count}} 次请求",
+    "tokens_value": "{{count}} Tokens",
+    "models_value": "{{count}} 个模型"
+  },
   "vertex_import": {
     "title": "Vertex JSON 登录",
     "description": "上传 Google 服务账号 JSON，使用 CLI vertex-import 同步规则写入 auth-dir/vertex-<project>.json。",
@@ -834,7 +850,7 @@
   },
   "quota_management": {
     "title": "配额管理",
-    "description": "集中查看 OAuth 额度与剩余情况",
+    "description": "集中查看 Antigravity/Codex/Gemini CLI 的配额，以及 Cursor 的用量遥测",
     "refresh_files": "刷新认证文件",
     "refresh_files_and_quota": "刷新认证文件&额度",
     "last_updated": "上次更新：{{time}}",
