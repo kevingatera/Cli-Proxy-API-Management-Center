@@ -382,6 +382,160 @@ const emptyCursorSummary = (): CursorUsageSummary => ({
   modelCount: 0
 });
 
+interface CursorUsageAccumulator {
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  modelNames: Set<string>;
+  lastSeenMillis: number | null;
+}
+
+interface CursorUsageIndex {
+  byAuthIndex: Map<string, CursorUsageSummary>;
+  byAuthId: Map<string, CursorUsageSummary>;
+}
+
+const CURSOR_USAGE_CACHE_TTL_MS = 1500;
+let cursorUsageIndexCache: { fetchedAt: number; index: CursorUsageIndex } | null = null;
+let cursorUsageIndexInFlight: Promise<CursorUsageIndex> | null = null;
+
+const createCursorUsageAccumulator = (): CursorUsageAccumulator => ({
+  requests: 0,
+  successCount: 0,
+  failureCount: 0,
+  totalTokens: 0,
+  modelNames: new Set<string>(),
+  lastSeenMillis: null
+});
+
+const cloneCursorSummary = (summary: CursorUsageSummary): CursorUsageSummary => ({ ...summary });
+
+const mergeCursorSummary = (
+  base: CursorUsageSummary,
+  patch: CursorUsageSummary | undefined
+): CursorUsageSummary => {
+  if (!patch) return base;
+  return {
+    requests: base.requests + patch.requests,
+    successCount: base.successCount + patch.successCount,
+    failureCount: base.failureCount + patch.failureCount,
+    totalTokens: base.totalTokens + patch.totalTokens,
+    modelCount: Math.max(base.modelCount, patch.modelCount),
+    lastSeenAt:
+      base.lastSeenAt && patch.lastSeenAt
+        ? (Date.parse(base.lastSeenAt) >= Date.parse(patch.lastSeenAt) ? base.lastSeenAt : patch.lastSeenAt)
+        : base.lastSeenAt ?? patch.lastSeenAt
+  };
+};
+
+const upsertCursorUsageAccumulator = (
+  map: Map<string, CursorUsageAccumulator>,
+  key: string,
+  model: string,
+  detail: Record<string, unknown>
+) => {
+  const normalizedKey = normalizeStringValue(key);
+  if (!normalizedKey) return;
+
+  const current = map.get(normalizedKey) ?? createCursorUsageAccumulator();
+  current.requests += 1;
+  const failed = Boolean(detail.failed);
+  if (failed) current.failureCount += 1;
+  else current.successCount += 1;
+
+  if (model) current.modelNames.add(model);
+  current.totalTokens += parseTokenTotal(detail.tokens);
+
+  const millis = parseTimestamp(detail.timestamp);
+  if (millis !== null && (current.lastSeenMillis === null || millis > current.lastSeenMillis)) {
+    current.lastSeenMillis = millis;
+  }
+  map.set(normalizedKey, current);
+};
+
+const finalizeCursorUsageMap = (
+  map: Map<string, CursorUsageAccumulator>
+): Map<string, CursorUsageSummary> => {
+  const out = new Map<string, CursorUsageSummary>();
+  map.forEach((acc, key) => {
+    out.set(key, {
+      requests: acc.requests,
+      successCount: acc.successCount,
+      failureCount: acc.failureCount,
+      totalTokens: acc.totalTokens,
+      modelCount: acc.modelNames.size,
+      lastSeenAt: acc.lastSeenMillis !== null ? new Date(acc.lastSeenMillis).toISOString() : undefined
+    });
+  });
+  return out;
+};
+
+const buildCursorUsageIndex = (usageRoot: Record<string, unknown>): CursorUsageIndex => {
+  const apis =
+    usageRoot && typeof usageRoot.apis === 'object' && usageRoot.apis !== null
+      ? (usageRoot.apis as Record<string, unknown>)
+      : {};
+
+  const byAuthIndexAcc = new Map<string, CursorUsageAccumulator>();
+  const byAuthIdAcc = new Map<string, CursorUsageAccumulator>();
+
+  for (const apiValue of Object.values(apis)) {
+    if (!apiValue || typeof apiValue !== 'object') continue;
+    const modelsRecord = (apiValue as Record<string, unknown>).models;
+    if (!modelsRecord || typeof modelsRecord !== 'object') continue;
+
+    for (const [modelKey, modelValue] of Object.entries(modelsRecord as Record<string, unknown>)) {
+      if (!modelValue || typeof modelValue !== 'object') continue;
+      const details = (modelValue as Record<string, unknown>).details;
+      if (!Array.isArray(details)) continue;
+
+      for (const detailValue of details) {
+        if (!detailValue || typeof detailValue !== 'object') continue;
+        const detail = detailValue as Record<string, unknown>;
+        const detailAuthIndex = normalizeAuthIndexValue(detail.auth_index ?? detail.authIndex);
+        const detailAuthId = normalizeStringValue(detail.auth_id ?? detail.authId);
+
+        if (detailAuthIndex) {
+          upsertCursorUsageAccumulator(byAuthIndexAcc, detailAuthIndex, modelKey, detail);
+        }
+        if (detailAuthId) {
+          upsertCursorUsageAccumulator(byAuthIdAcc, detailAuthId, modelKey, detail);
+        }
+      }
+    }
+  }
+
+  return {
+    byAuthIndex: finalizeCursorUsageMap(byAuthIndexAcc),
+    byAuthId: finalizeCursorUsageMap(byAuthIdAcc)
+  };
+};
+
+const loadCursorUsageIndex = async (): Promise<CursorUsageIndex> => {
+  const now = Date.now();
+  if (cursorUsageIndexCache && now - cursorUsageIndexCache.fetchedAt < CURSOR_USAGE_CACHE_TTL_MS) {
+    return cursorUsageIndexCache.index;
+  }
+  if (cursorUsageIndexInFlight) {
+    return cursorUsageIndexInFlight;
+  }
+
+  cursorUsageIndexInFlight = (async () => {
+    const response = await usageApi.getUsage();
+    const usageRoot = (response?.usage ?? response) as Record<string, unknown>;
+    const index = buildCursorUsageIndex(usageRoot);
+    cursorUsageIndexCache = { fetchedAt: Date.now(), index };
+    return index;
+  })();
+
+  try {
+    return await cursorUsageIndexInFlight;
+  } finally {
+    cursorUsageIndexInFlight = null;
+  }
+};
+
 const parseTokenTotal = (tokens: unknown): number => {
   if (!tokens || typeof tokens !== 'object') return 0;
   const record = tokens as Record<string, unknown>;
@@ -403,66 +557,31 @@ const parseTimestamp = (value: unknown): number | null => {
 const fetchCursorQuota = async (file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndexValue(rawAuthIndex);
-  if (!authIndex) {
+  const authIds = [
+    normalizeStringValue(file.id),
+    normalizeStringValue(file.name)
+  ].filter((value): value is string => Boolean(value));
+  if (!authIndex && authIds.length === 0) {
     throw new Error(t('cursor_quota.missing_auth_index'));
   }
 
-  const response = await usageApi.getUsage();
-  const usageRoot = (response?.usage ?? response) as Record<string, unknown>;
-  const apis =
-    usageRoot && typeof usageRoot.apis === 'object' && usageRoot.apis !== null
-      ? (usageRoot.apis as Record<string, unknown>)
-      : {};
+  const usageIndex = await loadCursorUsageIndex();
+  let summary = emptyCursorSummary();
 
-  let requests = 0;
-  let successCount = 0;
-  let failureCount = 0;
-  let totalTokens = 0;
-  let lastSeenMillis: number | null = null;
-  const models = new Set<string>();
+  if (authIndex) {
+    summary = mergeCursorSummary(summary, usageIndex.byAuthIndex.get(authIndex));
+  }
 
-  for (const apiValue of Object.values(apis)) {
-    if (!apiValue || typeof apiValue !== 'object') continue;
-    const modelsRecord = (apiValue as Record<string, unknown>).models;
-    if (!modelsRecord || typeof modelsRecord !== 'object') continue;
-
-    for (const [modelKey, modelValue] of Object.entries(modelsRecord as Record<string, unknown>)) {
-      if (!modelValue || typeof modelValue !== 'object') continue;
-      const details = (modelValue as Record<string, unknown>).details;
-      if (!Array.isArray(details)) continue;
-
-      let modelMatched = false;
-      for (const detailValue of details) {
-        if (!detailValue || typeof detailValue !== 'object') continue;
-        const detail = detailValue as Record<string, unknown>;
-        const detailAuthIndex = normalizeAuthIndexValue(detail.auth_index ?? detail.authIndex);
-        if (detailAuthIndex !== authIndex) continue;
-
-        modelMatched = true;
-        requests += 1;
-        const failed = Boolean(detail.failed);
-        if (failed) failureCount += 1;
-        else successCount += 1;
-        totalTokens += parseTokenTotal(detail.tokens);
-        const millis = parseTimestamp(detail.timestamp);
-        if (millis !== null && (lastSeenMillis === null || millis > lastSeenMillis)) {
-          lastSeenMillis = millis;
-        }
-      }
-      if (modelMatched) {
-        models.add(modelKey);
-      }
+  if (summary.requests === 0 && authIds.length > 0) {
+    for (const authId of authIds) {
+      const byAuthIdSummary = usageIndex.byAuthId.get(authId);
+      if (!byAuthIdSummary) continue;
+      summary = mergeCursorSummary(summary, byAuthIdSummary);
+      if (summary.requests > 0) break;
     }
   }
 
-  return {
-    requests,
-    successCount,
-    failureCount,
-    totalTokens,
-    modelCount: models.size,
-    lastSeenAt: lastSeenMillis !== null ? new Date(lastSeenMillis).toISOString() : undefined
-  };
+  return cloneCursorSummary(summary);
 };
 
 const renderAntigravityItems = (

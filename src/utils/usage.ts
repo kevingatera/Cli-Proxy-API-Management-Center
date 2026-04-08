@@ -38,7 +38,9 @@ export interface ModelPrice {
 export interface UsageDetail {
   timestamp: string;
   source: string;
-  auth_index: number;
+  auth_index: string | number;
+  auth_id?: string;
+  provider?: string;
   tokens: {
     input_tokens: number;
     output_tokens: number;
@@ -932,7 +934,7 @@ export interface StatusBarData {
 export function calculateStatusBarData(
   usageDetails: UsageDetail[],
   sourceFilter?: string,
-  authIndexFilter?: number
+  authIndexFilter?: string | number
 ): StatusBarData {
   const BLOCK_COUNT = 20;
   const BLOCK_DURATION_MS = 10 * 60 * 1000; // 10 minutes
@@ -961,8 +963,10 @@ export function calculateStatusBarData(
     if (sourceFilter !== undefined && detail.source !== sourceFilter) {
       return;
     }
-    if (authIndexFilter !== undefined && detail.auth_index !== authIndexFilter) {
-      return;
+    if (authIndexFilter !== undefined) {
+      const detailIndex = normalizeAuthIndex(detail.auth_index);
+      const targetIndex = normalizeAuthIndex(authIndexFilter);
+      if (!detailIndex || !targetIndex || detailIndex !== targetIndex) return;
     }
 
     // Calculate which block this falls into (0 = oldest, 19 = newest)
