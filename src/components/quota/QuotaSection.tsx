@@ -117,7 +117,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const lastUpdatedAt = useQuotaStore(config.storeLastUpdatedAtSelector);
 
   /* Removed useRef */
-  const [columns, gridRef] = useGridColumns(340);
+  const [columns, gridRef, gridReady] = useGridColumns(340);
   const [viewMode, setViewMode] = useState<ViewMode>('paged');
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
   const [relativeNow, setRelativeNow] = useState(() => Date.now());
@@ -194,14 +194,16 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     if (document.visibilityState !== 'visible') return;
     if (sectionLoading) return;
     if (filteredFiles.length === 0) return;
+    if (effectiveViewMode === 'paged' && !gridReady) return;
 
     const now = Date.now();
     if (lastAutoRefreshAtRef.current && now - lastAutoRefreshAtRef.current < AUTO_REFRESH_THROTTLE_MS)
       return;
     if (lastUpdatedAt && now - lastUpdatedAt < AUTO_REFRESH_STALE_MS) return;
 
-    const scope = effectiveViewMode === 'all' ? 'all' : 'page';
-    const targets = effectiveViewMode === 'all' ? filteredFiles : pageItems;
+    const shouldFetchAll = effectiveViewMode === 'all' || filteredFiles.length <= MAX_ITEMS_PER_PAGE;
+    const scope = shouldFetchAll ? 'all' : 'page';
+    const targets = shouldFetchAll ? filteredFiles : pageItems;
     if (targets.length === 0) return;
 
     lastAutoRefreshAtRef.current = now;
@@ -210,6 +212,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     disabled,
     effectiveViewMode,
     filteredFiles,
+    gridReady,
     lastUpdatedAt,
     loadQuota,
     loading,
@@ -221,6 +224,20 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   useEffect(() => {
     maybeAutoRefresh();
   }, [maybeAutoRefresh]);
+
+  useEffect(() => {
+    if (disabled || loading || sectionLoading) return;
+    if (effectiveViewMode === 'paged' && !gridReady) return;
+    if (pageItems.length === 0) return;
+
+    const idleTargets = pageItems.filter((item) => {
+      const state = quota[item.name] as QuotaStatusState | undefined;
+      return !state || state.status === 'idle';
+    });
+    if (idleTargets.length === 0) return;
+
+    void loadQuota(idleTargets, 'page', setLoading);
+  }, [disabled, effectiveViewMode, gridReady, loadQuota, loading, pageItems, quota, sectionLoading, setLoading]);
 
   useEffect(() => {
     const handleVisibility = () => {
