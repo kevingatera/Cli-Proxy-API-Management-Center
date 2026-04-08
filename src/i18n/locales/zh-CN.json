@@ -488,12 +488,17 @@
     "load_failed": "用量获取失败：{{message}}",
     "missing_auth_index": "认证文件缺少 auth_index",
     "empty_usage": "该凭证暂时还没有用量遥测数据。",
+    "last_seen_never": "暂无遥测",
     "refresh_button": "刷新用量",
     "fetch_all": "获取全部",
+    "health_label": "观测成功率",
     "telemetry_label": "本地遥测",
     "requests_value": "{{count}} 次请求",
+    "failures_value": "{{count}} 次失败",
     "tokens_value": "{{count}} Tokens",
-    "models_value": "{{count}} 个模型"
+    "tokens_unavailable": "暂无 Tokens 遥测",
+    "models_value": "{{count}} 个模型",
+    "telemetry_note": "当前为 Cursor CLI 凭证的本地遥测视图（官方未开放账户额度 API）。"
   },
   "vertex_import": {
     "title": "Vertex JSON 登录",

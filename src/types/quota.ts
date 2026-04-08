@@ -152,6 +152,7 @@ export interface CursorUsageSummary {
   failureCount: number;
   totalTokens: number;
   modelCount: number;
+  tokenTelemetryCount?: number;
   lastSeenAt?: string;
 }
 

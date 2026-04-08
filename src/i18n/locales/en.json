@@ -488,12 +488,17 @@
     "load_failed": "Failed to load usage: {{message}}",
     "missing_auth_index": "Auth file missing auth_index",
     "empty_usage": "No usage telemetry yet for this credential.",
+    "last_seen_never": "no telemetry yet",
     "refresh_button": "Refresh Usage",
     "fetch_all": "Fetch All",
+    "health_label": "Observed success rate",
     "telemetry_label": "Local telemetry",
     "requests_value": "{{count}} requests",
+    "failures_value": "{{count}} failures",
     "tokens_value": "{{count}} tokens",
-    "models_value": "{{count}} models"
+    "tokens_unavailable": "tokens unavailable",
+    "models_value": "{{count}} models",
+    "telemetry_note": "Telemetry-based view for Cursor CLI credentials (account quota API is not exposed)."
   },
   "vertex_import": {
     "title": "Vertex JSON Login",

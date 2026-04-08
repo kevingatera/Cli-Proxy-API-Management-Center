@@ -36,6 +36,7 @@ import {
   parseAntigravityPayload,
   parseCodexUsagePayload,
   parseGeminiCliQuotaPayload,
+  extractCodexChatgptAccountId,
   resolveCodexChatgptAccountId,
   resolveCodexPlanType,
   resolveGeminiCliProjectId,
@@ -271,6 +272,51 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   return windows;
 };
 
+const resolveCodexChatgptAccountIdFromFile = async (file: AuthFileItem): Promise<string | null> => {
+  try {
+    const text = await authFilesApi.downloadText(file.name);
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const metadata =
+      parsed.metadata && typeof parsed.metadata === 'object' && parsed.metadata !== null
+        ? (parsed.metadata as Record<string, unknown>)
+        : null;
+    const attributes =
+      parsed.attributes && typeof parsed.attributes === 'object' && parsed.attributes !== null
+        ? (parsed.attributes as Record<string, unknown>)
+        : null;
+
+    const candidates: unknown[] = [
+      parsed.chatgpt_account_id,
+      parsed.chatgptAccountId,
+      parsed.id_token,
+      parsed.idToken,
+      metadata?.chatgpt_account_id,
+      metadata?.chatgptAccountId,
+      metadata?.id_token,
+      metadata?.idToken,
+      attributes?.chatgpt_account_id,
+      attributes?.chatgptAccountId,
+      attributes?.id_token,
+      attributes?.idToken
+    ];
+
+    for (const candidate of candidates) {
+      const extracted = extractCodexChatgptAccountId(candidate);
+      if (extracted) return extracted;
+
+      const direct = normalizeStringValue(candidate);
+      if (direct && !direct.includes('.')) return direct;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
 const fetchCodexQuota = async (
   file: AuthFileItem,
   t: TFunction
@@ -282,7 +328,10 @@ const fetchCodexQuota = async (
   }
 
   const planTypeFromFile = resolveCodexPlanType(file);
-  const accountId = resolveCodexChatgptAccountId(file);
+  let accountId = resolveCodexChatgptAccountId(file);
+  if (!accountId) {
+    accountId = await resolveCodexChatgptAccountIdFromFile(file);
+  }
   if (!accountId) {
     throw new Error(t('codex_quota.missing_account_id'));
   }
@@ -379,7 +428,8 @@ const emptyCursorSummary = (): CursorUsageSummary => ({
   successCount: 0,
   failureCount: 0,
   totalTokens: 0,
-  modelCount: 0
+  modelCount: 0,
+  tokenTelemetryCount: 0
 });
 
 interface CursorUsageAccumulator {
@@ -387,6 +437,7 @@ interface CursorUsageAccumulator {
   successCount: number;
   failureCount: number;
   totalTokens: number;
+  tokenTelemetryCount: number;
   modelNames: Set<string>;
   lastSeenMillis: number | null;
 }
@@ -405,6 +456,7 @@ const createCursorUsageAccumulator = (): CursorUsageAccumulator => ({
   successCount: 0,
   failureCount: 0,
   totalTokens: 0,
+  tokenTelemetryCount: 0,
   modelNames: new Set<string>(),
   lastSeenMillis: null
 });
@@ -422,6 +474,7 @@ const mergeCursorSummary = (
     failureCount: base.failureCount + patch.failureCount,
     totalTokens: base.totalTokens + patch.totalTokens,
     modelCount: Math.max(base.modelCount, patch.modelCount),
+    tokenTelemetryCount: (base.tokenTelemetryCount ?? 0) + (patch.tokenTelemetryCount ?? 0),
     lastSeenAt:
       base.lastSeenAt && patch.lastSeenAt
         ? (Date.parse(base.lastSeenAt) >= Date.parse(patch.lastSeenAt) ? base.lastSeenAt : patch.lastSeenAt)
@@ -445,7 +498,11 @@ const upsertCursorUsageAccumulator = (
   else current.successCount += 1;
 
   if (model) current.modelNames.add(model);
-  current.totalTokens += parseTokenTotal(detail.tokens);
+  const tokenMetrics = parseTokenMetrics(detail.tokens);
+  current.totalTokens += tokenMetrics.total;
+  if (tokenMetrics.reported) {
+    current.tokenTelemetryCount += 1;
+  }
 
   const millis = parseTimestamp(detail.timestamp);
   if (millis !== null && (current.lastSeenMillis === null || millis > current.lastSeenMillis)) {
@@ -465,6 +522,7 @@ const finalizeCursorUsageMap = (
       failureCount: acc.failureCount,
       totalTokens: acc.totalTokens,
       modelCount: acc.modelNames.size,
+      tokenTelemetryCount: acc.tokenTelemetryCount,
       lastSeenAt: acc.lastSeenMillis !== null ? new Date(acc.lastSeenMillis).toISOString() : undefined
     });
   });
@@ -536,15 +594,33 @@ const loadCursorUsageIndex = async (): Promise<CursorUsageIndex> => {
   }
 };
 
-const parseTokenTotal = (tokens: unknown): number => {
-  if (!tokens || typeof tokens !== 'object') return 0;
+const parseTokenMetrics = (tokens: unknown): { total: number; reported: boolean } => {
+  if (!tokens || typeof tokens !== 'object') return { total: 0, reported: false };
   const record = tokens as Record<string, unknown>;
-  const total =
-    normalizeNumberValue(record.total_tokens ?? record.totalTokens) ??
-    ((normalizeNumberValue(record.input_tokens ?? record.inputTokens) ?? 0) +
-      (normalizeNumberValue(record.output_tokens ?? record.outputTokens) ?? 0) +
-      (normalizeNumberValue(record.reasoning_tokens ?? record.reasoningTokens) ?? 0));
-  return Math.max(0, Math.round(total));
+  const totalNode = normalizeNumberValue(record.total_tokens ?? record.totalTokens);
+
+  const input = normalizeNumberValue(record.input_tokens ?? record.inputTokens);
+  const output = normalizeNumberValue(record.output_tokens ?? record.outputTokens);
+  const reasoning = normalizeNumberValue(record.reasoning_tokens ?? record.reasoningTokens);
+  const cached = normalizeNumberValue(record.cached_tokens ?? record.cachedTokens);
+
+  if (totalNode !== null) {
+    const isAllZero =
+      totalNode === 0 &&
+      (input ?? 0) === 0 &&
+      (output ?? 0) === 0 &&
+      (reasoning ?? 0) === 0 &&
+      (cached ?? 0) === 0;
+    return { total: Math.max(0, Math.round(totalNode)), reported: !isAllZero };
+  }
+
+  const reported = input !== null || output !== null || reasoning !== null;
+  if (!reported) {
+    return { total: 0, reported: false };
+  }
+
+  const total = (input ?? 0) + (output ?? 0) + (reasoning ?? 0);
+  return { total: Math.max(0, Math.round(total)), reported: true };
 };
 
 const parseTimestamp = (value: unknown): number | null => {
@@ -764,34 +840,38 @@ const renderCursorItems = (
   t: TFunction,
   helpers: QuotaRenderHelpers
 ): ReactNode => {
-  const { styles: styleMap } = helpers;
-  const { createElement: h } = React;
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
   const summary = quota.summary ?? emptyCursorSummary();
-
-  if (summary.requests <= 0) {
-    return h('div', { className: styleMap.quotaMessage }, t('cursor_quota.empty_usage'));
-  }
-
-  const successPct = summary.requests > 0 ? Math.round((summary.successCount / summary.requests) * 100) : 0;
-  const lastSeenLabel = summary.lastSeenAt ? formatQuotaResetTime(summary.lastSeenAt) : '-';
+  const hasTelemetry = summary.requests > 0;
+  const hasTokenTelemetry = (summary.tokenTelemetryCount ?? 0) > 0;
+  const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
+  const lastSeenLabel = summary.lastSeenAt
+    ? formatQuotaResetTime(summary.lastSeenAt)
+    : t('cursor_quota.last_seen_never');
 
   return h(
-    'div',
-    { className: styleMap.quotaRow },
+    Fragment,
+    null,
     h(
       'div',
-      { className: styleMap.quotaRowHeader },
-      h('span', { className: styleMap.quotaModel }, t('cursor_quota.telemetry_label')),
+      { className: styleMap.quotaRow },
       h(
         'div',
-        { className: styleMap.quotaMeta },
-        h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
-        h('span', { className: styleMap.quotaReset }, lastSeenLabel)
-      )
+        { className: styleMap.quotaRowHeader },
+        h('span', { className: styleMap.quotaModel }, t('cursor_quota.health_label')),
+        h(
+          'div',
+          { className: styleMap.quotaMeta },
+          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h('span', { className: styleMap.quotaReset }, lastSeenLabel)
+        )
+      ),
+      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
     ),
     h(
       'div',
-      { className: styleMap.quotaMeta },
+      { className: styleMap.quotaMeta, style: { marginTop: '0.5rem' } },
       h(
         'span',
         { className: styleMap.quotaAmount },
@@ -800,13 +880,25 @@ const renderCursorItems = (
       h(
         'span',
         { className: styleMap.quotaAmount },
-        t('cursor_quota.tokens_value', { count: summary.totalTokens })
+        t('cursor_quota.failures_value', { count: summary.failureCount })
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        hasTokenTelemetry
+          ? t('cursor_quota.tokens_value', { count: summary.totalTokens })
+          : t('cursor_quota.tokens_unavailable')
       ),
       h(
         'span',
         { className: styleMap.quotaAmount },
         t('cursor_quota.models_value', { count: summary.modelCount })
       )
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
+      hasTelemetry ? t('cursor_quota.telemetry_note') : t('cursor_quota.empty_usage')
     )
   );
 };
