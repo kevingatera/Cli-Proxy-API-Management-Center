@@ -17,14 +17,17 @@ export function ChartLineSelector({
   onChange
 }: ChartLineSelectorProps) {
   const { t } = useTranslation();
+  const uniqueLines = (lines: string[]) => Array.from(new Set(lines)).slice(0, maxLines);
 
   const handleAdd = () => {
     if (chartLines.length >= maxLines) return;
     const unusedModel = modelNames.find((m) => !chartLines.includes(m));
     if (unusedModel) {
-      onChange([...chartLines, unusedModel]);
-    } else {
-      onChange([...chartLines, 'all']);
+      onChange(uniqueLines([...chartLines, unusedModel]));
+      return;
+    }
+    if (!chartLines.includes('all')) {
+      onChange(uniqueLines([...chartLines, 'all']));
     }
   };
 
@@ -38,7 +41,8 @@ export function ChartLineSelector({
   const handleChange = (index: number, value: string) => {
     const newLines = [...chartLines];
     newLines[index] = value;
-    onChange(newLines);
+    const deduped = uniqueLines(newLines);
+    onChange(deduped.length ? deduped : ['all']);
   };
 
   return (
