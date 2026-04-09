@@ -51,6 +51,7 @@ export interface UsageDetail {
   };
   failed: boolean;
   __modelName?: string;
+  __endpoint?: string;
 }
 
 export interface ApiStats {
@@ -60,6 +61,36 @@ export interface ApiStats {
   totalCost: number;
   models: Record<string, { requests: number; tokens: number }>;
 }
+
+export type UsageOutcomeFilter = 'all' | 'success' | 'failure';
+export type UsageTimeWindowFilter = 'all' | '1h' | '24h' | '7d' | '30d';
+
+export interface UsageFilters {
+  query: string;
+  provider: string;
+  endpoint: string;
+  model: string;
+  authIndex: string;
+  outcome: UsageOutcomeFilter;
+  timeWindow: UsageTimeWindowFilter;
+}
+
+export interface UsageFilterOptions {
+  providers: string[];
+  endpoints: string[];
+  models: string[];
+  authIndexes: string[];
+}
+
+export const DEFAULT_USAGE_FILTERS: UsageFilters = {
+  query: '',
+  provider: 'all',
+  endpoint: 'all',
+  model: 'all',
+  authIndex: 'all',
+  outcome: 'all',
+  timeWindow: 'all'
+};
 
 const TOKENS_PER_PRICE_UNIT = 1_000_000;
 const MODEL_PRICE_STORAGE_KEY = 'cli-proxy-model-prices-v2';
@@ -312,7 +343,7 @@ export function collectUsageDetails(usageData: any): UsageDetail[] {
   }
   const apis = usageData.apis || {};
   const details: UsageDetail[] = [];
-  Object.values(apis as Record<string, any>).forEach((apiEntry) => {
+  Object.entries(apis as Record<string, any>).forEach(([endpoint, apiEntry]) => {
     const models = apiEntry?.models || {};
     Object.entries(models as Record<string, any>).forEach(([modelName, modelEntry]) => {
       const modelDetails = Array.isArray(modelEntry.details) ? modelEntry.details : [];
@@ -321,13 +352,255 @@ export function collectUsageDetails(usageData: any): UsageDetail[] {
           details.push({
             ...detail,
             source: normalizeUsageSourceId(detail.source),
-            __modelName: modelName
+            __modelName: modelName,
+            __endpoint: endpoint
           });
         }
       });
     });
   });
   return details;
+}
+
+const toSortedUnique = (input: Iterable<string>): string[] =>
+  Array.from(new Set(Array.from(input).filter((item) => item && item.trim().length > 0)))
+    .sort((a, b) => a.localeCompare(b));
+
+const normalizeFilterValue = (value: string | null | undefined): string =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : 'all';
+
+const getWindowStartTimestamp = (window: UsageTimeWindowFilter, nowMs: number): number | null => {
+  switch (window) {
+    case '1h':
+      return nowMs - 60 * 60 * 1000;
+    case '24h':
+      return nowMs - 24 * 60 * 60 * 1000;
+    case '7d':
+      return nowMs - 7 * 24 * 60 * 60 * 1000;
+    case '30d':
+      return nowMs - 30 * 24 * 60 * 60 * 1000;
+    default:
+      return null;
+  }
+};
+
+const matchesOutcome = (detail: UsageDetail, outcome: UsageOutcomeFilter): boolean => {
+  if (outcome === 'all') {
+    return true;
+  }
+  if (outcome === 'success') {
+    return detail.failed !== true;
+  }
+  return detail.failed === true;
+};
+
+const toLower = (value: unknown): string =>
+  typeof value === 'string' ? value.toLowerCase() : value === null || value === undefined ? '' : String(value).toLowerCase();
+
+const matchesQuery = (detail: UsageDetail, queryLower: string): boolean => {
+  if (!queryLower) {
+    return true;
+  }
+  return (
+    toLower(detail.__endpoint).includes(queryLower) ||
+    toLower(detail.__modelName).includes(queryLower) ||
+    toLower(detail.source).includes(queryLower) ||
+    toLower(detail.provider).includes(queryLower) ||
+    toLower(detail.auth_index).includes(queryLower) ||
+    toLower(detail.auth_id).includes(queryLower)
+  );
+};
+
+const isFilteredIn = (
+  detail: UsageDetail,
+  filters: UsageFilters,
+  queryLower: string,
+  windowStart: number | null
+): boolean => {
+  if (windowStart !== null) {
+    const ts = Date.parse(detail.timestamp);
+    if (Number.isNaN(ts) || ts < windowStart) {
+      return false;
+    }
+  }
+
+  if (!matchesOutcome(detail, filters.outcome)) {
+    return false;
+  }
+
+  if (!matchesQuery(detail, queryLower)) {
+    return false;
+  }
+
+  if (filters.provider !== 'all' && (detail.provider || '').trim() !== filters.provider) {
+    return false;
+  }
+  if (filters.endpoint !== 'all' && (detail.__endpoint || '').trim() !== filters.endpoint) {
+    return false;
+  }
+  if (filters.model !== 'all' && (detail.__modelName || '').trim() !== filters.model) {
+    return false;
+  }
+
+  if (filters.authIndex !== 'all') {
+    const normalized = normalizeAuthIndex(detail.auth_index);
+    if (!normalized || normalized !== filters.authIndex) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const buildUsageSnapshotFromDetails = (
+  usageData: any,
+  details: UsageDetail[]
+): any => {
+  if (!details.length) {
+    return {
+      ...(usageData && typeof usageData === 'object' ? usageData : {}),
+      total_requests: 0,
+      success_count: 0,
+      failure_count: 0,
+      total_tokens: 0,
+      apis: {}
+    };
+  }
+
+  const apis: Record<string, any> = {};
+  let totalRequests = 0;
+  let successCount = 0;
+  let failureCount = 0;
+  let totalTokens = 0;
+
+  details.forEach((detail) => {
+    const endpoint = detail.__endpoint || 'unknown';
+    const model = detail.__modelName || 'Unknown';
+    const tokens = extractTotalTokens(detail);
+    const failed = detail.failed === true;
+
+    if (!apis[endpoint]) {
+      apis[endpoint] = {
+        total_requests: 0,
+        success_count: 0,
+        failure_count: 0,
+        total_tokens: 0,
+        models: {}
+      };
+    }
+    const endpointEntry = apis[endpoint];
+
+    if (!endpointEntry.models[model]) {
+      endpointEntry.models[model] = {
+        total_requests: 0,
+        success_count: 0,
+        failure_count: 0,
+        total_tokens: 0,
+        details: []
+      };
+    }
+    const modelEntry = endpointEntry.models[model];
+
+    endpointEntry.total_requests += 1;
+    endpointEntry.total_tokens += tokens;
+    modelEntry.total_requests += 1;
+    modelEntry.total_tokens += tokens;
+    if (failed) {
+      endpointEntry.failure_count += 1;
+      modelEntry.failure_count += 1;
+      failureCount += 1;
+    } else {
+      endpointEntry.success_count += 1;
+      modelEntry.success_count += 1;
+      successCount += 1;
+    }
+
+    const detailPayload: Record<string, unknown> = { ...detail };
+    delete detailPayload.__endpoint;
+    delete detailPayload.__modelName;
+    modelEntry.details.push(detailPayload);
+
+    totalRequests += 1;
+    totalTokens += tokens;
+  });
+
+  return {
+    ...(usageData && typeof usageData === 'object' ? usageData : {}),
+    total_requests: totalRequests,
+    success_count: successCount,
+    failure_count: failureCount,
+    total_tokens: totalTokens,
+    apis
+  };
+};
+
+export function getUsageFilterOptions(usageData: any): UsageFilterOptions {
+  const details = collectUsageDetails(usageData);
+  const providers = new Set<string>();
+  const endpoints = new Set<string>();
+  const models = new Set<string>();
+  const authIndexes = new Set<string>();
+
+  details.forEach((detail) => {
+    if (detail.provider && detail.provider.trim()) {
+      providers.add(detail.provider.trim());
+    }
+    if (detail.__endpoint && detail.__endpoint.trim()) {
+      endpoints.add(detail.__endpoint.trim());
+    }
+    if (detail.__modelName && detail.__modelName.trim()) {
+      models.add(detail.__modelName.trim());
+    }
+    const normalizedIndex = normalizeAuthIndex(detail.auth_index);
+    if (normalizedIndex) {
+      authIndexes.add(normalizedIndex);
+    }
+  });
+
+  return {
+    providers: toSortedUnique(providers),
+    endpoints: toSortedUnique(endpoints),
+    models: toSortedUnique(models),
+    authIndexes: toSortedUnique(authIndexes)
+  };
+}
+
+export function filterUsageData(
+  usageData: any,
+  partialFilters: Partial<UsageFilters>,
+  nowMs: number = Date.now()
+): any {
+  if (!usageData) {
+    return usageData;
+  }
+  const filters: UsageFilters = {
+    ...DEFAULT_USAGE_FILTERS,
+    ...partialFilters,
+    query: (partialFilters.query ?? DEFAULT_USAGE_FILTERS.query).trim(),
+    provider: normalizeFilterValue(partialFilters.provider),
+    endpoint: normalizeFilterValue(partialFilters.endpoint),
+    model: normalizeFilterValue(partialFilters.model),
+    authIndex: normalizeFilterValue(partialFilters.authIndex),
+    outcome:
+      partialFilters.outcome === 'success' || partialFilters.outcome === 'failure'
+        ? partialFilters.outcome
+        : 'all',
+    timeWindow:
+      partialFilters.timeWindow === '1h' ||
+      partialFilters.timeWindow === '24h' ||
+      partialFilters.timeWindow === '7d' ||
+      partialFilters.timeWindow === '30d'
+        ? partialFilters.timeWindow
+        : 'all'
+  };
+
+  const queryLower = filters.query.toLowerCase();
+  const windowStart = getWindowStartTimestamp(filters.timeWindow, nowMs);
+  const filteredDetails = collectUsageDetails(usageData).filter((detail) =>
+    isFilteredIn(detail, filters, queryLower, windowStart)
+  );
+
+  return buildUsageSnapshotFromDetails(usageData, filteredDetails);
 }
 
 /**
