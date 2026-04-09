@@ -21,6 +21,7 @@ import {
   StatCards,
   UsageChart,
   ChartLineSelector,
+  UsageFiltersCard,
   ApiDetailsCard,
   ModelStatsCard,
   PriceSettingsCard,
@@ -28,7 +29,15 @@ import {
   useSparklines,
   useChartData
 } from '@/components/usage';
-import { getModelNamesFromUsage, getApiStats, getModelStats } from '@/utils/usage';
+import {
+  DEFAULT_USAGE_FILTERS,
+  filterUsageData,
+  getApiStats,
+  getModelNamesFromUsage,
+  getModelStats,
+  getUsageFilterOptions,
+  type UsageFilters
+} from '@/utils/usage';
 import styles from './UsagePage.module.scss';
 
 const USAGE_VIEW_STATE_KEY = 'cliproxy-usage-view-v1';
@@ -111,6 +120,11 @@ export function UsagePage() {
   // Chart lines state
   const [chartLines, setChartLines] = useState<string[]>(savedViewState.chartLines);
   const MAX_CHART_LINES = 9;
+  const [filters, setFilters] = useState<UsageFilters>({ ...DEFAULT_USAGE_FILTERS });
+
+  const filteredUsage = useMemo(() => filterUsageData(usage, filters), [usage, filters]);
+  const usageForDisplay = filteredUsage ?? usage;
+  const filterOptions = useMemo(() => getUsageFilterOptions(usage), [usage]);
 
   // Sparklines hook
   const {
@@ -119,7 +133,7 @@ export function UsagePage() {
     rpmSparkline,
     tpmSparkline,
     costSparkline
-  } = useSparklines({ usage, loading });
+  } = useSparklines({ usage: usageForDisplay, loading });
 
   // Chart data hook
   const {
@@ -131,7 +145,7 @@ export function UsagePage() {
     tokensChartData,
     requestsChartOptions,
     tokensChartOptions
-  } = useChartData({ usage, chartLines, isDark, isMobile });
+  } = useChartData({ usage: usageForDisplay, chartLines, isDark, isMobile });
 
   const applyViewState = useCallback((value: {
     chartLines?: string[];
@@ -153,9 +167,10 @@ export function UsagePage() {
   );
 
   // Derived data
-  const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
-  const apiStats = useMemo(() => getApiStats(usage, modelPrices), [usage, modelPrices]);
-  const modelStats = useMemo(() => getModelStats(usage, modelPrices), [usage, modelPrices]);
+  const modelNames = useMemo(() => getModelNamesFromUsage(usageForDisplay), [usageForDisplay]);
+  const allModelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
+  const apiStats = useMemo(() => getApiStats(usageForDisplay, modelPrices), [usageForDisplay, modelPrices]);
+  const modelStats = useMemo(() => getModelStats(usageForDisplay, modelPrices), [usageForDisplay, modelPrices]);
   const hasPrices = Object.keys(modelPrices).length > 0;
 
   return (
@@ -213,9 +228,18 @@ export function UsagePage() {
 
       {error && <div className={styles.errorBox}>{error}</div>}
 
+      <UsageFiltersCard
+        filters={filters}
+        options={filterOptions}
+        matchedRequests={usageForDisplay?.total_requests ?? 0}
+        totalRequests={usage?.total_requests ?? 0}
+        onChange={setFilters}
+        onReset={() => setFilters({ ...DEFAULT_USAGE_FILTERS })}
+      />
+
       {/* Stats Overview Cards */}
       <StatCards
-        usage={usage}
+        usage={usageForDisplay}
         loading={loading}
         modelPrices={modelPrices}
         sparklines={{
@@ -267,7 +291,7 @@ export function UsagePage() {
 
       {/* Price Settings */}
       <PriceSettingsCard
-        modelNames={modelNames}
+        modelNames={allModelNames}
         modelPrices={modelPrices}
         onPricesChange={setModelPrices}
       />

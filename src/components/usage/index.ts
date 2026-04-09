@@ -18,6 +18,9 @@ export type { UsageChartProps } from './UsageChart';
 export { ChartLineSelector } from './ChartLineSelector';
 export type { ChartLineSelectorProps } from './ChartLineSelector';
 
+export { UsageFiltersCard } from './UsageFiltersCard';
+export type { UsageFiltersCardProps } from './UsageFiltersCard';
+
 export { ApiDetailsCard } from './ApiDetailsCard';
 export type { ApiDetailsCardProps } from './ApiDetailsCard';
 
