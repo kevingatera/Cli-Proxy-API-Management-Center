@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import type { Config } from '@/types';
+import type { Config, RoutingPolicyConfig, RoutingPreview, RoutingTrace } from '@/types';
 import { normalizeConfigResponse } from './transformers';
 
 export const configApi = {
@@ -112,4 +112,48 @@ export const configApi = {
    * 更新路由策略
    */
   updateRoutingStrategy: (strategy: string) => apiClient.put('/routing/strategy', { value: strategy }),
+
+  /**
+   * 获取路由策略（policy）
+   */
+  async getRoutingPolicy(): Promise<RoutingPolicyConfig> {
+    const data = await apiClient.get('/routing/policy');
+    return data?.policy ?? data ?? {};
+  },
+
+  /**
+   * 更新路由策略（policy）
+   */
+  updateRoutingPolicy: (policy: RoutingPolicyConfig) => apiClient.put('/routing/policy', { policy }),
+
+  /**
+   * 预览路由计划
+   */
+  async previewRouting(model: string, providers?: string[], pinnedAuthId?: string): Promise<RoutingPreview> {
+    const data = await apiClient.post('/routing/preview', {
+      model,
+      providers,
+      pinned_auth_id: pinnedAuthId,
+    });
+    return data?.preview ?? data;
+  },
+
+  /**
+   * 获取路由追踪
+   */
+  async getRoutingTraces(params?: {
+    limit?: number;
+    model?: string;
+    provider?: string;
+    failed?: boolean;
+  }): Promise<RoutingTrace[]> {
+    const query = new URLSearchParams();
+    if (params?.limit && Number.isFinite(params.limit)) query.set('limit', String(params.limit));
+    if (params?.model) query.set('model', params.model);
+    if (params?.provider) query.set('provider', params.provider);
+    if (params?.failed !== undefined) query.set('failed', String(params.failed));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    const data = await apiClient.get(`/routing/traces${suffix}`);
+    return Array.isArray(data?.traces) ? data.traces : [];
+  },
 };

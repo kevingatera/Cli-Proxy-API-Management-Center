@@ -5,7 +5,10 @@ import type {
   OpenAIProviderConfig,
   ProviderKeyConfig,
   AmpcodeConfig,
-  AmpcodeModelMapping
+  AmpcodeModelMapping,
+  RoutingPolicyConfig,
+  RoutingPolicyRuleConfig,
+  RoutingPolicyRouteConfig
 } from '@/types';
 import type { Config } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
@@ -234,6 +237,84 @@ const normalizeAmpcodeConfig = (payload: any): AmpcodeConfig | undefined => {
   return config;
 };
 
+const normalizeRoutingPolicyRoute = (route: any): RoutingPolicyRouteConfig | null => {
+  if (!route || typeof route !== 'object') return null;
+  const provider = String(route.provider ?? '').trim().toLowerCase();
+  if (!provider) return null;
+  const authOrderSource = route['auth-order'] ?? route.authOrder ?? route.auth_order;
+  const authOrder = Array.isArray(authOrderSource)
+    ? authOrderSource
+        .map((item) => String(item ?? '').trim())
+        .filter((item, index, array) => item.length > 0 && array.indexOf(item) === index)
+    : [];
+  const includeRemainingAuth = normalizeBoolean(route['include-remaining-auth'] ?? route.includeRemainingAuth);
+  const normalized: RoutingPolicyRouteConfig = { provider };
+  if (authOrder.length) normalized.authOrder = authOrder;
+  if (includeRemainingAuth !== undefined) normalized.includeRemainingAuth = includeRemainingAuth;
+  return normalized;
+};
+
+const normalizeRoutingPolicyRule = (rule: any): RoutingPolicyRuleConfig | undefined => {
+  if (!rule || typeof rule !== 'object') return undefined;
+  const routeList = Array.isArray(rule.route)
+    ? rule.route
+        .map((entry: any) => normalizeRoutingPolicyRoute(entry))
+        .filter(Boolean) as RoutingPolicyRouteConfig[]
+    : [];
+  const includeRemainingProviders = normalizeBoolean(
+    rule['include-remaining-providers'] ?? rule.includeRemainingProviders
+  );
+  const normalized: RoutingPolicyRuleConfig = {};
+  if (routeList.length) normalized.route = routeList;
+  if (includeRemainingProviders !== undefined) normalized.includeRemainingProviders = includeRemainingProviders;
+  if (!normalized.route && includeRemainingProviders === undefined) return undefined;
+  return normalized;
+};
+
+const normalizeRoutingPolicy = (payload: any): RoutingPolicyConfig | undefined => {
+  const source = payload?.policy ?? payload;
+  if (!source || typeof source !== 'object') return undefined;
+  const normalized: RoutingPolicyConfig = {};
+  const enabled = normalizeBoolean(source.enabled);
+  if (enabled !== undefined) normalized.enabled = enabled;
+  const defaults = normalizeRoutingPolicyRule(source.defaults);
+  if (defaults) normalized.defaults = defaults;
+
+  const overridesSource = source['model-overrides'] ?? source.modelOverrides ?? source.model_overrides;
+  if (overridesSource && typeof overridesSource === 'object') {
+    const modelOverrides: Record<string, RoutingPolicyRuleConfig> = {};
+    Object.entries(overridesSource).forEach(([key, value]) => {
+      const modelKey = String(key ?? '').trim();
+      if (!modelKey) return;
+      const rule = normalizeRoutingPolicyRule(value);
+      if (rule) modelOverrides[modelKey] = rule;
+    });
+    if (Object.keys(modelOverrides).length) normalized.modelOverrides = modelOverrides;
+  }
+
+  const fallbackSource = source.fallback;
+  if (fallbackSource && typeof fallbackSource === 'object') {
+    const onRaw = fallbackSource.on;
+    if (Array.isArray(onRaw)) {
+      const on = onRaw
+        .map((item) => String(item ?? '').trim())
+        .filter((item, index, array) => item.length > 0 && array.indexOf(item) === index);
+      if (on.length) normalized.fallback = { on };
+    }
+  }
+
+  const observabilitySource = source.observability;
+  if (observabilitySource && typeof observabilitySource === 'object') {
+    const traceLimit = Number(observabilitySource['trace-limit'] ?? observabilitySource.traceLimit);
+    if (Number.isFinite(traceLimit)) {
+      normalized.observability = { traceLimit: Math.max(0, Math.trunc(traceLimit)) };
+    }
+  }
+
+  if (Object.keys(normalized).length === 0) return undefined;
+  return normalized;
+};
+
 /**
  * 规范化 /config 返回值
  */
@@ -264,6 +345,10 @@ export const normalizeConfigResponse = (raw: any): Config => {
   const routing = raw.routing;
   if (routing && typeof routing === 'object') {
     config.routingStrategy = routing.strategy ?? routing['strategy'];
+    const routingPolicy = normalizeRoutingPolicy(routing.policy);
+    if (routingPolicy) {
+      config.routingPolicy = routingPolicy;
+    }
   } else {
     config.routingStrategy = raw['routing-strategy'] ?? raw.routingStrategy;
   }

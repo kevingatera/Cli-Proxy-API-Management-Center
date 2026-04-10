@@ -163,3 +163,226 @@
     width: 100%;
   }
 }
+
+.policyHint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: $spacing-md;
+}
+
+.policyTopRow {
+  display: flex;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+  margin-bottom: $spacing-md;
+}
+
+.policyGuided {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.policyAdvanced {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.policyEditor {
+  width: 100%;
+  min-height: 280px;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  padding: $spacing-sm;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  background: var(--background-secondary);
+  color: var(--text-primary);
+}
+
+.policyButtonRow {
+  display: flex;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.routeList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.routeCard {
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  padding: $spacing-sm;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  background: var(--background-secondary);
+}
+
+.routeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.routeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-sm;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.routeAuthSection {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.routeAuthHeading {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.routeAuthPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.routeAuthPill,
+.routeAuthPillSelected {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.routeAuthPillSelected {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 16%, var(--card-bg));
+}
+
+.routeAuthCurrent {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.routeAuthEmpty {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.fallbackCard {
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  padding: $spacing-sm;
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.fallbackRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fallbackItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.policyBottomRow {
+  display: flex;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.previewSection {
+  border-top: 1px solid var(--border-color);
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.previewResult {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  font-size: 13px;
+}
+
+.previewProviderRow {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: $spacing-sm;
+  align-items: baseline;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tracesSection {
+  border-top: 1px solid var(--border-color);
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.traceList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.traceCard {
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  padding: $spacing-sm;
+  background: var(--background-secondary);
+}
+
+.traceHead {
+  display: flex;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.traceMeta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.traceError {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--error-color, #c93d4a);
+}

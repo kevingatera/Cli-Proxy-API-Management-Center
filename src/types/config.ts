@@ -11,6 +11,76 @@ export interface QuotaExceededConfig {
   switchPreviewModel?: boolean;
 }
 
+export interface RoutingPolicyRouteConfig {
+  provider: string;
+  authOrder?: string[];
+  includeRemainingAuth?: boolean;
+}
+
+export interface RoutingPolicyRuleConfig {
+  route?: RoutingPolicyRouteConfig[];
+  includeRemainingProviders?: boolean;
+}
+
+export interface RoutingFallbackPolicyConfig {
+  on?: string[];
+}
+
+export interface RoutingPolicyObservabilityConfig {
+  traceLimit?: number;
+}
+
+export interface RoutingPolicyConfig {
+  enabled?: boolean;
+  defaults?: RoutingPolicyRuleConfig;
+  modelOverrides?: Record<string, RoutingPolicyRuleConfig>;
+  fallback?: RoutingFallbackPolicyConfig;
+  observability?: RoutingPolicyObservabilityConfig;
+}
+
+export interface RoutingPreviewProviderDetail {
+  provider: string;
+  authOrder?: string[];
+  availableAuthIds?: string[];
+}
+
+export interface RoutingPreview {
+  model: string;
+  providers: string[];
+  orderedProviders: string[];
+  strategy: string;
+  policyEnabled: boolean;
+  fallbackOn?: string[];
+  providerDetails?: RoutingPreviewProviderDetail[];
+}
+
+export interface RoutingTraceAttempt {
+  provider: string;
+  authId?: string;
+  stage: string;
+  success: boolean;
+  httpStatus?: number;
+  error?: string;
+  fallback?: boolean;
+  fallbackReason?: string;
+}
+
+export interface RoutingTrace {
+  id: string;
+  timestamp: string;
+  operation: string;
+  model: string;
+  providers: string[];
+  orderedProviders?: string[];
+  strategy: string;
+  policyEnabled: boolean;
+  fallbackOn?: string[];
+  attempts?: RoutingTraceAttempt[];
+  finalStatus: string;
+  stopReason?: string;
+  error?: string;
+}
+
 export interface Config {
   debug?: boolean;
   proxyUrl?: string;
@@ -23,6 +93,7 @@ export interface Config {
   wsAuth?: boolean;
   forceModelPrefix?: boolean;
   routingStrategy?: string;
+  routingPolicy?: RoutingPolicyConfig;
   apiKeys?: string[];
   ampcode?: AmpcodeConfig;
   geminiApiKeys?: GeminiKeyConfig[];
@@ -46,6 +117,7 @@ export type RawConfigSection =
   | 'ws-auth'
   | 'force-model-prefix'
   | 'routing/strategy'
+  | 'routing/policy'
   | 'api-keys'
   | 'ampcode'
   | 'gemini-api-key'
