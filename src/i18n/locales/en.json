@@ -519,6 +519,10 @@
     "tokens_value": "{{count}} tokens",
     "tokens_unavailable": "tokens unavailable",
     "models_value": "{{count}} models",
+    "model_breakdown_title": "Model mix and estimated Go limits",
+    "model_usage_value": "{{requests}} requests, {{failures}} failures, {{tokens}} · {{limits}}",
+    "model_limits_value": "5h {{fiveHour}}, week {{weekly}}, month {{monthly}}",
+    "model_limits_unknown": "limits not listed",
     "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage."
   },
   "vertex_import": {

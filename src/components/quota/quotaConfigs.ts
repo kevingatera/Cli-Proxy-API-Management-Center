@@ -14,6 +14,7 @@ import type {
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
+  CursorModelUsageSummary,
   CursorQuotaState,
   CursorUsageSummary,
   GeminiCliParsedBucket,
@@ -447,6 +448,7 @@ interface CursorUsageAccumulator {
   totalTokens: number;
   tokenTelemetryCount: number;
   modelNames: Set<string>;
+  models: Map<string, CursorUsageAccumulator>;
   lastSeenMillis: number | null;
 }
 
@@ -467,10 +469,46 @@ const createCursorUsageAccumulator = (): CursorUsageAccumulator => ({
   totalTokens: 0,
   tokenTelemetryCount: 0,
   modelNames: new Set<string>(),
+  models: new Map<string, CursorUsageAccumulator>(),
   lastSeenMillis: null
 });
 
-const cloneCursorSummary = (summary: CursorUsageSummary): CursorUsageSummary => ({ ...summary });
+const cloneCursorSummary = (summary: CursorUsageSummary): CursorUsageSummary => ({
+  ...summary,
+  models: summary.models?.map((model) => ({ ...model }))
+});
+
+const mergeModelUsageSummaries = (
+  base: CursorModelUsageSummary[] | undefined,
+  patch: CursorModelUsageSummary[] | undefined
+): CursorModelUsageSummary[] | undefined => {
+  if (!base?.length && !patch?.length) return undefined;
+  const byModel = new Map<string, CursorModelUsageSummary>();
+
+  const upsert = (item: CursorModelUsageSummary) => {
+    const current = byModel.get(item.model);
+    if (!current) {
+      byModel.set(item.model, { ...item });
+      return;
+    }
+    current.requests += item.requests;
+    current.successCount += item.successCount;
+    current.failureCount += item.failureCount;
+    current.totalTokens += item.totalTokens;
+    current.tokenTelemetryCount = (current.tokenTelemetryCount ?? 0) + (item.tokenTelemetryCount ?? 0);
+    current.lastSeenAt =
+      current.lastSeenAt && item.lastSeenAt
+        ? (Date.parse(current.lastSeenAt) >= Date.parse(item.lastSeenAt) ? current.lastSeenAt : item.lastSeenAt)
+        : current.lastSeenAt ?? item.lastSeenAt;
+  };
+
+  base?.forEach(upsert);
+  patch?.forEach(upsert);
+  return Array.from(byModel.values()).sort((a, b) => {
+    if (b.requests !== a.requests) return b.requests - a.requests;
+    return a.model.localeCompare(b.model);
+  });
+};
 
 const mergeCursorSummary = (
   base: CursorUsageSummary,
@@ -484,6 +522,7 @@ const mergeCursorSummary = (
     totalTokens: base.totalTokens + patch.totalTokens,
     modelCount: Math.max(base.modelCount, patch.modelCount),
     tokenTelemetryCount: (base.tokenTelemetryCount ?? 0) + (patch.tokenTelemetryCount ?? 0),
+    models: mergeModelUsageSummaries(base.models, patch.models),
     lastSeenAt:
       base.lastSeenAt && patch.lastSeenAt
         ? (Date.parse(base.lastSeenAt) >= Date.parse(patch.lastSeenAt) ? base.lastSeenAt : patch.lastSeenAt)
@@ -513,6 +552,23 @@ const upsertCursorUsageAccumulator = (
     current.tokenTelemetryCount += 1;
   }
 
+  if (model) {
+    const modelAcc = current.models.get(model) ?? createCursorUsageAccumulator();
+    modelAcc.requests += 1;
+    if (failed) modelAcc.failureCount += 1;
+    else modelAcc.successCount += 1;
+    modelAcc.modelNames.add(model);
+    modelAcc.totalTokens += tokenMetrics.total;
+    if (tokenMetrics.reported) {
+      modelAcc.tokenTelemetryCount += 1;
+    }
+    const modelMillis = parseTimestamp(detail.timestamp);
+    if (modelMillis !== null && (modelAcc.lastSeenMillis === null || modelMillis > modelAcc.lastSeenMillis)) {
+      modelAcc.lastSeenMillis = modelMillis;
+    }
+    current.models.set(model, modelAcc);
+  }
+
   const millis = parseTimestamp(detail.timestamp);
   if (millis !== null && (current.lastSeenMillis === null || millis > current.lastSeenMillis)) {
     current.lastSeenMillis = millis;
@@ -525,6 +581,20 @@ const finalizeCursorUsageMap = (
 ): Map<string, CursorUsageSummary> => {
   const out = new Map<string, CursorUsageSummary>();
   map.forEach((acc, key) => {
+    const models = Array.from(acc.models.entries())
+      .map(([model, modelAcc]) => ({
+        model,
+        requests: modelAcc.requests,
+        successCount: modelAcc.successCount,
+        failureCount: modelAcc.failureCount,
+        totalTokens: modelAcc.totalTokens,
+        tokenTelemetryCount: modelAcc.tokenTelemetryCount,
+        lastSeenAt: modelAcc.lastSeenMillis !== null ? new Date(modelAcc.lastSeenMillis).toISOString() : undefined
+      }))
+      .sort((a, b) => {
+        if (b.requests !== a.requests) return b.requests - a.requests;
+        return a.model.localeCompare(b.model);
+      });
     out.set(key, {
       requests: acc.requests,
       successCount: acc.successCount,
@@ -532,6 +602,7 @@ const finalizeCursorUsageMap = (
       totalTokens: acc.totalTokens,
       modelCount: acc.modelNames.size,
       tokenTelemetryCount: acc.tokenTelemetryCount,
+      models,
       lastSeenAt: acc.lastSeenMillis !== null ? new Date(acc.lastSeenMillis).toISOString() : undefined
     });
   });
@@ -947,6 +1018,33 @@ const renderCursorItems = (
   );
 };
 
+const ZEN_GO_MODEL_LIMITS: Record<
+  string,
+  { label: string; fiveHour: number; weekly: number; monthly: number }
+> = {
+  'glm-5.1': { label: 'GLM-5.1', fiveHour: 880, weekly: 2150, monthly: 4300 },
+  'glm-5': { label: 'GLM-5', fiveHour: 1150, weekly: 2880, monthly: 5750 },
+  'kimi-k2.5': { label: 'Kimi K2.5', fiveHour: 1850, weekly: 4630, monthly: 9250 },
+  'kimi-k2.6': { label: 'Kimi K2.6', fiveHour: 1150, weekly: 2880, monthly: 5750 },
+  'mimo-v2-pro': { label: 'MiMo-V2-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
+  'mimo-v2-omni': { label: 'MiMo-V2-Omni', fiveHour: 2150, weekly: 5450, monthly: 10900 },
+  'mimo-v2.5-pro': { label: 'MiMo-V2.5-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
+  'mimo-v2.5': { label: 'MiMo-V2.5', fiveHour: 2150, weekly: 5450, monthly: 10900 },
+  'minimax-m2.7': { label: 'MiniMax M2.7', fiveHour: 3400, weekly: 8500, monthly: 17000 },
+  'minimax-m2.5': { label: 'MiniMax M2.5', fiveHour: 6300, weekly: 15900, monthly: 31800 },
+  'qwen3.6-plus': { label: 'Qwen3.6 Plus', fiveHour: 3300, weekly: 8200, monthly: 16300 },
+  'qwen3.5-plus': { label: 'Qwen3.5 Plus', fiveHour: 10200, weekly: 25200, monthly: 50500 },
+  'deepseek-v4-pro': { label: 'DeepSeek V4 Pro', fiveHour: 1300, weekly: 3250, monthly: 6500 },
+  'deepseek-v4-flash': { label: 'DeepSeek V4 Flash', fiveHour: 7450, weekly: 18600, monthly: 37300 }
+};
+
+const normalizeZenGoModelId = (model: string): string => {
+  const lower = model.trim().toLowerCase();
+  const withoutPrefix = lower.startsWith('opencode-go/') ? lower.slice('opencode-go/'.length) : lower;
+  const parts = withoutPrefix.split('/');
+  return parts[parts.length - 1];
+};
+
 const renderZenItems = (
   quota: ZenQuotaState,
   t: TFunction,
@@ -961,6 +1059,7 @@ const renderZenItems = (
   const lastSeenLabel = summary.lastSeenAt
     ? formatQuotaResetTime(summary.lastSeenAt)
     : t('zen_quota.last_seen_never');
+  const modelBreakdown = (summary.models ?? []).slice(0, 6);
 
   return h(
     Fragment,
@@ -1011,7 +1110,61 @@ const renderZenItems = (
       'div',
       { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
       hasTelemetry ? t('zen_quota.telemetry_note') : t('zen_quota.empty_usage')
-    )
+    ),
+    modelBreakdown.length > 0 &&
+      h(
+        'div',
+        { className: styleMap.quotaMessage, style: { marginTop: '0.75rem' } },
+        h(
+          'div',
+          { style: { fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' } },
+          t('zen_quota.model_breakdown_title')
+        ),
+        ...modelBreakdown.map((model) => {
+          const modelId = normalizeZenGoModelId(model.model);
+          const limits = ZEN_GO_MODEL_LIMITS[modelId];
+          const label = limits?.label ?? model.model;
+          const tokenText =
+            (model.tokenTelemetryCount ?? 0) > 0
+              ? t('zen_quota.tokens_value', { count: model.totalTokens })
+              : t('zen_quota.tokens_unavailable');
+          const limitText = limits
+            ? t('zen_quota.model_limits_value', {
+                fiveHour: limits.fiveHour.toLocaleString(),
+                weekly: limits.weekly.toLocaleString(),
+                monthly: limits.monthly.toLocaleString()
+              })
+            : t('zen_quota.model_limits_unknown');
+          return h(
+            'div',
+            {
+              key: model.model,
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                padding: '0.3rem 0',
+                borderTop: '1px solid var(--border-color)'
+              }
+            },
+            h(
+              'span',
+              { style: { color: 'var(--text-primary)', fontWeight: 500 } },
+              label
+            ),
+            h(
+              'span',
+              { style: { textAlign: 'right' } },
+              t('zen_quota.model_usage_value', {
+                requests: model.requests,
+                failures: model.failureCount,
+                tokens: tokenText,
+                limits: limitText
+              })
+            )
+          );
+        })
+      )
   );
 };
 

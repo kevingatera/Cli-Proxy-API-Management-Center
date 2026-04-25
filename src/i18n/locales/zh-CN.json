@@ -519,6 +519,10 @@
     "tokens_value": "{{count}} Tokens",
     "tokens_unavailable": "暂无 Tokens 遥测",
     "models_value": "{{count}} 个模型",
+    "model_breakdown_title": "模型组合和 Go 估算限额",
+    "model_usage_value": "{{requests}} 次请求，{{failures}} 次失败，{{tokens}} · {{limits}}",
+    "model_limits_value": "5 小时 {{fiveHour}}，每周 {{weekly}}，每月 {{monthly}}",
+    "model_limits_unknown": "暂无限额参考",
     "telemetry_note": "当前为 OpenCode Zen/Go Key 的本地遥测视图。Zen 未开放账户额度 API，因此这里使用代理观测到的请求、失败、模型和 Token 用量。"
   },
   "vertex_import": {

@@ -154,6 +154,17 @@ export interface CursorUsageSummary {
   modelCount: number;
   tokenTelemetryCount?: number;
   lastSeenAt?: string;
+  models?: CursorModelUsageSummary[];
+}
+
+export interface CursorModelUsageSummary {
+  model: string;
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  tokenTelemetryCount?: number;
+  lastSeenAt?: string;
 }
 
 export interface CursorQuotaState {
