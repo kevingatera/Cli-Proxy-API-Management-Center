@@ -392,6 +392,7 @@
     "filter_claude": "Claude",
     "filter_codex": "Codex",
     "filter_cursor": "Cursor",
+    "filter_opencode-go": "OpenCode Go",
     "filter_antigravity": "Antigravity",
     "filter_iflow": "iFlow",
     "filter_vertex": "Vertex",
@@ -499,6 +500,26 @@
     "tokens_unavailable": "tokens unavailable",
     "models_value": "{{count}} models",
     "telemetry_note": "Telemetry-based view for Cursor CLI credentials (account quota API is not exposed)."
+  },
+  "zen_quota": {
+    "title": "OpenCode Zen Usage",
+    "empty_title": "No OpenCode Zen Keys",
+    "empty_desc": "Add an OpenCode Zen or Go API key to view local usage telemetry.",
+    "idle": "Not loaded. Click Refresh Button.",
+    "loading": "Loading usage...",
+    "load_failed": "Failed to load usage: {{message}}",
+    "missing_api_key": "Zen entry missing API key",
+    "empty_usage": "No Zen usage telemetry yet for this key.",
+    "last_seen_never": "no telemetry yet",
+    "refresh_button": "Refresh Usage",
+    "fetch_all": "Fetch All",
+    "health_label": "Observed success rate",
+    "requests_value": "{{count}} requests",
+    "failures_value": "{{count}} failures",
+    "tokens_value": "{{count}} tokens",
+    "tokens_unavailable": "tokens unavailable",
+    "models_value": "{{count}} models",
+    "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage."
   },
   "vertex_import": {
     "title": "Vertex JSON Login",
@@ -875,7 +896,7 @@
   },
   "quota_management": {
     "title": "Quota Management",
-    "description": "Monitor OAuth quota status for Antigravity/Codex/Gemini CLI and usage telemetry for Cursor credentials.",
+    "description": "Monitor OAuth quota status for Antigravity/Codex/Gemini CLI plus usage telemetry for Cursor and OpenCode Zen credentials.",
     "refresh_files": "Refresh auth files",
     "refresh_files_and_quota": "Refresh files & quota",
     "last_updated": "Last updated: {{time}}",

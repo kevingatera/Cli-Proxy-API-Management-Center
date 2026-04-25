@@ -26,6 +26,11 @@ export function isCursorFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'cursor';
 }
 
+export function isZenFile(file: AuthFileItem): boolean {
+  const provider = resolveAuthProvider(file);
+  return provider === 'opencode-go' || provider === 'zen' || provider === 'opencode-zen';
+}
+
 export function isRuntimeOnlyAuthFile(file: AuthFileItem): boolean {
   const raw = file['runtime_only'] ?? file.runtimeOnly;
   if (typeof raw === 'boolean') return raw;

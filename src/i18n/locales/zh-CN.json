@@ -392,6 +392,7 @@
     "filter_claude": "Claude",
     "filter_codex": "Codex",
     "filter_cursor": "Cursor",
+    "filter_opencode-go": "OpenCode Go",
     "filter_antigravity": "Antigravity",
     "filter_iflow": "iFlow",
     "filter_vertex": "Vertex",
@@ -499,6 +500,26 @@
     "tokens_unavailable": "暂无 Tokens 遥测",
     "models_value": "{{count}} 个模型",
     "telemetry_note": "当前为 Cursor CLI 凭证的本地遥测视图（官方未开放账户额度 API）。"
+  },
+  "zen_quota": {
+    "title": "OpenCode Zen 用量",
+    "empty_title": "暂无 OpenCode Zen Key",
+    "empty_desc": "添加 OpenCode Zen 或 Go API Key 后即可查看本地用量遥测。",
+    "idle": "尚未加载用量，请点击刷新按钮。",
+    "loading": "正在加载用量...",
+    "load_failed": "用量获取失败：{{message}}",
+    "missing_api_key": "Zen 配置缺少 API Key",
+    "empty_usage": "该 Key 暂时还没有 Zen 用量遥测数据。",
+    "last_seen_never": "暂无遥测",
+    "refresh_button": "刷新用量",
+    "fetch_all": "获取全部",
+    "health_label": "观测成功率",
+    "requests_value": "{{count}} 次请求",
+    "failures_value": "{{count}} 次失败",
+    "tokens_value": "{{count}} Tokens",
+    "tokens_unavailable": "暂无 Tokens 遥测",
+    "models_value": "{{count}} 个模型",
+    "telemetry_note": "当前为 OpenCode Zen/Go Key 的本地遥测视图。Zen 未开放账户额度 API，因此这里使用代理观测到的请求、失败、模型和 Token 用量。"
   },
   "vertex_import": {
     "title": "Vertex JSON 登录",
@@ -875,7 +896,7 @@
   },
   "quota_management": {
     "title": "配额管理",
-    "description": "集中查看 Antigravity/Codex/Gemini CLI 的配额，以及 Cursor 的用量遥测",
+    "description": "集中查看 Antigravity/Codex/Gemini CLI 的配额，以及 Cursor 和 OpenCode Zen 的用量遥测",
     "refresh_files": "刷新认证文件",
     "refresh_files_and_quota": "刷新认证文件&额度",
     "last_updated": "上次更新：{{time}}",

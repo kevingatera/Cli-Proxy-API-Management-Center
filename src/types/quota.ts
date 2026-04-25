@@ -162,3 +162,12 @@ export interface CursorQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+export type ZenUsageSummary = CursorUsageSummary;
+
+export interface ZenQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  summary: ZenUsageSummary;
+  error?: string;
+  errorStatus?: number;
+}

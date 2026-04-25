@@ -7,13 +7,14 @@ import { useTranslation } from 'react-i18next';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { Card } from '@/components/ui/Card';
 import { useAuthStore, useConfigStore, useQuotaStationKeepingStore, useQuotaStore } from '@/stores';
-import { authFilesApi, configFileApi } from '@/services/api';
+import { authFilesApi } from '@/services/api';
 import {
   QuotaSection,
   ANTIGRAVITY_CONFIG,
   CODEX_CONFIG,
   CURSOR_CONFIG,
-  GEMINI_CLI_CONFIG
+  GEMINI_CLI_CONFIG,
+  ZEN_CONFIG
 } from '@/components/quota';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { AuthFileItem } from '@/types';
@@ -61,6 +62,7 @@ export function QuotaPage() {
   const { t, i18n } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const config = useConfigStore((state) => state.config);
+  const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const stationKeepingEnabled = useQuotaStationKeepingStore((state) => state.enabled);
   const setStationKeepingEnabled = useQuotaStationKeepingStore((state) => state.setEnabled);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
@@ -74,12 +76,12 @@ export function QuotaPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      await configFileApi.fetchConfigYaml();
+      await fetchConfig(undefined, true);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError((prev) => prev || errorMessage);
     }
-  }, [t]);
+  }, [fetchConfig, t]);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
@@ -191,6 +193,67 @@ export function QuotaPage() {
     };
   }, [codexQuota, codexQuotaLastUpdatedAt, config?.routingStrategy, files, i18n.language, t]);
 
+  const zenFiles = useMemo(() => {
+    const entries: AuthFileItem[] = [];
+    const seen = new Set<string>();
+    const addEntry = (entry: {
+      name: string;
+      apiKey?: string;
+      baseUrl?: string;
+      prefix?: string;
+      source: string;
+    }) => {
+      const apiKey = String(entry.apiKey ?? '').trim();
+      const baseUrl = String(entry.baseUrl ?? '').trim();
+      const prefix = String(entry.prefix ?? '').trim();
+      if (!apiKey && !prefix) return;
+
+      const key = apiKey ? `api:${apiKey}` : `prefix:${prefix}|${baseUrl}|${entry.source}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      entries.push({
+        name: entry.name,
+        type: 'opencode-go',
+        provider: 'opencode-go',
+        apiKey,
+        baseUrl,
+        prefix,
+        runtimeOnly: true,
+        source: entry.source
+      });
+    };
+
+    (config?.openaiCompatibility ?? []).forEach((provider, providerIndex) => {
+      const baseUrl = String(provider.baseUrl ?? '').trim();
+      if (!/opencode\.ai\/zen/i.test(baseUrl)) return;
+      const labelBase = provider.name || 'opencode-go';
+      (provider.apiKeyEntries ?? []).forEach((entry, keyIndex) => {
+        addEntry({
+          name: `${labelBase} · OpenAI ${keyIndex + 1}`,
+          apiKey: entry.apiKey,
+          baseUrl,
+          prefix: provider.prefix,
+          source: `openai-compatibility:${providerIndex}:${keyIndex}`
+        });
+      });
+    });
+
+    (config?.claudeApiKeys ?? []).forEach((entry, index) => {
+      const baseUrl = String(entry.baseUrl ?? '').trim();
+      if (!/opencode\.ai\/zen/i.test(baseUrl)) return;
+      addEntry({
+        name: `opencode-go · DeepSeek ${index + 1}`,
+        apiKey: entry.apiKey,
+        baseUrl,
+        prefix: entry.prefix,
+        source: `claude-api-key:${index}`
+      });
+    });
+
+    return entries;
+  }, [config?.claudeApiKeys, config?.openaiCompatibility]);
+
   return (
     <div className={`page-shell ${styles.container}`}>
       <div className="page-header">
@@ -282,6 +345,13 @@ export function QuotaPage() {
       <QuotaSection
         config={CURSOR_CONFIG}
         files={files}
+        loading={loading}
+        disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
+      />
+      <QuotaSection
+        config={ZEN_CONFIG}
+        files={zenFiles}
         loading={loading}
         disabled={disableControls}
         stationKeepingEnabled={stationKeepingEnabled}

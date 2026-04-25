@@ -18,9 +18,12 @@ import type {
   CursorUsageSummary,
   GeminiCliParsedBucket,
   GeminiCliQuotaBucketState,
-  GeminiCliQuotaState
+  GeminiCliQuotaState,
+  ZenQuotaState,
+  ZenUsageSummary
 } from '@/types';
 import { apiCallApi, authFilesApi, getApiCallErrorMessage, usageApi } from '@/services/api';
+import { buildCandidateUsageSourceIds, normalizeUsageSourceId } from '@/utils/usage';
 import {
   ANTIGRAVITY_QUOTA_URLS,
   ANTIGRAVITY_REQUEST_HEADERS,
@@ -50,6 +53,7 @@ import {
   isCodexFile,
   isCursorFile,
   isGeminiCliFile,
+  isZenFile,
   isRuntimeOnlyAuthFile
 } from '@/utils/quota';
 import type { QuotaRenderHelpers } from './QuotaCard';
@@ -57,7 +61,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'codex' | 'gemini-cli' | 'cursor';
+type QuotaType = 'antigravity' | 'codex' | 'gemini-cli' | 'cursor' | 'opencode-go';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
 
@@ -66,18 +70,22 @@ export interface QuotaStore {
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
   cursorQuota: Record<string, CursorQuotaState>;
+  zenQuota: Record<string, ZenQuotaState>;
   antigravityQuotaLastUpdatedAt: number | null;
   codexQuotaLastUpdatedAt: number | null;
   geminiCliQuotaLastUpdatedAt: number | null;
   cursorQuotaLastUpdatedAt: number | null;
+  zenQuotaLastUpdatedAt: number | null;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
   setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
+  setZenQuota: (updater: QuotaUpdater<Record<string, ZenQuotaState>>) => void;
   setAntigravityQuotaLastUpdatedAt: (timestamp: number | null) => void;
   setCodexQuotaLastUpdatedAt: (timestamp: number | null) => void;
   setGeminiCliQuotaLastUpdatedAt: (timestamp: number | null) => void;
   setCursorQuotaLastUpdatedAt: (timestamp: number | null) => void;
+  setZenQuotaLastUpdatedAt: (timestamp: number | null) => void;
   clearQuotaCache: () => void;
 }
 
@@ -445,6 +453,7 @@ interface CursorUsageAccumulator {
 interface CursorUsageIndex {
   byAuthIndex: Map<string, CursorUsageSummary>;
   byAuthId: Map<string, CursorUsageSummary>;
+  bySource: Map<string, CursorUsageSummary>;
 }
 
 const CURSOR_USAGE_CACHE_TTL_MS = 1500;
@@ -537,6 +546,7 @@ const buildCursorUsageIndex = (usageRoot: Record<string, unknown>): CursorUsageI
 
   const byAuthIndexAcc = new Map<string, CursorUsageAccumulator>();
   const byAuthIdAcc = new Map<string, CursorUsageAccumulator>();
+  const bySourceAcc = new Map<string, CursorUsageAccumulator>();
 
   for (const apiValue of Object.values(apis)) {
     if (!apiValue || typeof apiValue !== 'object') continue;
@@ -553,6 +563,7 @@ const buildCursorUsageIndex = (usageRoot: Record<string, unknown>): CursorUsageI
         const detail = detailValue as Record<string, unknown>;
         const detailAuthIndex = normalizeAuthIndexValue(detail.auth_index ?? detail.authIndex);
         const detailAuthId = normalizeStringValue(detail.auth_id ?? detail.authId);
+        const detailSource = normalizeUsageSourceId(detail.source);
 
         if (detailAuthIndex) {
           upsertCursorUsageAccumulator(byAuthIndexAcc, detailAuthIndex, modelKey, detail);
@@ -560,13 +571,17 @@ const buildCursorUsageIndex = (usageRoot: Record<string, unknown>): CursorUsageI
         if (detailAuthId) {
           upsertCursorUsageAccumulator(byAuthIdAcc, detailAuthId, modelKey, detail);
         }
+        if (detailSource) {
+          upsertCursorUsageAccumulator(bySourceAcc, detailSource, modelKey, detail);
+        }
       }
     }
   }
 
   return {
     byAuthIndex: finalizeCursorUsageMap(byAuthIndexAcc),
-    byAuthId: finalizeCursorUsageMap(byAuthIdAcc)
+    byAuthId: finalizeCursorUsageMap(byAuthIdAcc),
+    bySource: finalizeCursorUsageMap(bySourceAcc)
   };
 };
 
@@ -656,6 +671,35 @@ const fetchCursorQuota = async (file: AuthFileItem, t: TFunction): Promise<Curso
       if (summary.requests > 0) break;
     }
   }
+
+  return cloneCursorSummary(summary);
+};
+
+const fetchZenQuota = async (file: AuthFileItem, t: TFunction): Promise<ZenUsageSummary> => {
+  const apiKey = normalizeStringValue(file.apiKey ?? file.api_key);
+  const prefix = normalizeStringValue(file.prefix);
+  const sourceIds = new Set<string>();
+
+  buildCandidateUsageSourceIds({
+    apiKey: apiKey ?? undefined,
+    prefix: prefix ?? undefined
+  }).forEach((id) => sourceIds.add(id));
+  if (apiKey) {
+    sourceIds.add(normalizeUsageSourceId(apiKey));
+  }
+  if (prefix) {
+    sourceIds.add(normalizeUsageSourceId(prefix));
+  }
+
+  if (sourceIds.size === 0) {
+    throw new Error(t('zen_quota.missing_api_key'));
+  }
+
+  const usageIndex = await loadCursorUsageIndex();
+  let summary = emptyCursorSummary();
+  sourceIds.forEach((sourceId) => {
+    summary = mergeCursorSummary(summary, usageIndex.bySource.get(sourceId));
+  });
 
   return cloneCursorSummary(summary);
 };
@@ -903,6 +947,74 @@ const renderCursorItems = (
   );
 };
 
+const renderZenItems = (
+  quota: ZenQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
+  const summary = quota.summary ?? emptyCursorSummary();
+  const hasTelemetry = summary.requests > 0;
+  const hasTokenTelemetry = (summary.tokenTelemetryCount ?? 0) > 0;
+  const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
+  const lastSeenLabel = summary.lastSeenAt
+    ? formatQuotaResetTime(summary.lastSeenAt)
+    : t('zen_quota.last_seen_never');
+
+  return h(
+    Fragment,
+    null,
+    h(
+      'div',
+      { className: styleMap.quotaRow },
+      h(
+        'div',
+        { className: styleMap.quotaRowHeader },
+        h('span', { className: styleMap.quotaModel }, t('zen_quota.health_label')),
+        h(
+          'div',
+          { className: styleMap.quotaMeta },
+          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h('span', { className: styleMap.quotaReset }, lastSeenLabel)
+        )
+      ),
+      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMeta, style: { marginTop: '0.5rem' } },
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('zen_quota.requests_value', { count: summary.requests })
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('zen_quota.failures_value', { count: summary.failureCount })
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        hasTokenTelemetry
+          ? t('zen_quota.tokens_value', { count: summary.totalTokens })
+          : t('zen_quota.tokens_unavailable')
+      ),
+      h(
+        'span',
+        { className: styleMap.quotaAmount },
+        t('zen_quota.models_value', { count: summary.modelCount })
+      )
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
+      hasTelemetry ? t('zen_quota.telemetry_note') : t('zen_quota.empty_usage')
+    )
+  );
+};
+
 export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQuotaGroup[]> = {
   type: 'antigravity',
   i18nPrefix: 'antigravity_quota',
@@ -1004,4 +1116,28 @@ export const CURSOR_CONFIG: QuotaConfig<CursorQuotaState, CursorUsageSummary> = 
   controlClassName: styles.codexControl,
   gridClassName: styles.codexGrid,
   renderQuotaItems: renderCursorItems
+};
+
+export const ZEN_CONFIG: QuotaConfig<ZenQuotaState, ZenUsageSummary> = {
+  type: 'opencode-go',
+  i18nPrefix: 'zen_quota',
+  filterFn: (file) => isZenFile(file),
+  fetchQuota: fetchZenQuota,
+  storeSelector: (state) => state.zenQuota,
+  storeSetter: 'setZenQuota',
+  storeLastUpdatedAtSelector: (state) => state.zenQuotaLastUpdatedAt,
+  storeLastUpdatedAtSetter: 'setZenQuotaLastUpdatedAt',
+  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildSuccessState: (summary) => ({ status: 'success', summary }),
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    summary: emptyCursorSummary(),
+    error: message,
+    errorStatus: status
+  }),
+  cardClassName: styles.codexCard,
+  controlsClassName: styles.codexControls,
+  controlClassName: styles.codexControl,
+  gridClassName: styles.codexGrid,
+  renderQuotaItems: renderZenItems
 };
