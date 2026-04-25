@@ -303,6 +303,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   useEffect(() => {
     if (!lastUpdatedAt) return;
+    setRelativeNow(Date.now());
     const interval = window.setInterval(() => setRelativeNow(Date.now()), 15_000);
     return () => window.clearInterval(interval);
   }, [lastUpdatedAt]);
