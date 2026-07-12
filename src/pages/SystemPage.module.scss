@@ -111,6 +111,48 @@
   font-size: 12px;
 }
 
+.clickableTitle {
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover {
+    color: var(--primary-color, #4f9cf9);
+  }
+}
+
+.collapseChevron {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  width: 10px;
+}
+
+// Shared "Show all" toggle, matches the Usage page styling.
+.listToggle {
+  display: block;
+  width: 100%;
+  margin-top: $spacing-sm;
+  padding: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--primary-color, #4f9cf9);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: var(--primary-color, #4f9cf9);
+    background: color-mix(in srgb, var(--primary-color, #4f9cf9) 6%, transparent);
+  }
+}
+
 .smokeTestGrid {
   display: grid;
   grid-template-columns: 1fr;

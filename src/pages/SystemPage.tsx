@@ -14,6 +14,8 @@ import styles from './SystemPage.module.scss';
 
 const SYSTEM_MODEL_TEST_TIMEOUT_MS = 30_000;
 const SMOKE_TEST_VARIANTS = ['', 'fast', 'minimal', 'low', 'medium', 'high', 'xhigh', 'auto', 'none'];
+// Above this tag count a model group collapses to just a header row until expanded.
+const MODEL_GROUP_COLLAPSE_THRESHOLD = 8;
 
 const splitSmokeTestModel = (value: string): { model: string; variant: string } => {
   const trimmed = String(value || '').trim();
@@ -100,6 +102,73 @@ const extractChatResponseText = (payload: unknown): string => {
 
   return extractTextSegments(body.output ?? body.output_text ?? body.content).join('\n').trim();
 };
+
+/**
+ * A single model-group row in the System page models card.
+ *
+ * Groups with more than MODEL_GROUP_COLLAPSE_THRESHOLD tags collapse to just
+ * the header (label + count) by default and expand on click. This keeps the
+ * page readable when a group has dozens of tags (e.g. 131 GPT variants).
+ */
+function ModelGroupRow({
+  group,
+  modelsCountLabel,
+}: {
+  group: { id: string; label: string; items: { name: string; alias?: string; description?: string }[] };
+  modelsCountLabel: string;
+}) {
+  const { t } = useTranslation();
+  const count = group.items.length;
+  const initiallyOpen = count <= MODEL_GROUP_COLLAPSE_THRESHOLD;
+  const [open, setOpen] = useState(initiallyOpen);
+  const collapsible = count > MODEL_GROUP_COLLAPSE_THRESHOLD;
+
+  return (
+    <div className="item-row">
+      <div className="item-meta">
+        <div
+          className={`item-title ${collapsible ? styles.clickableTitle : ''}`}
+          onClick={collapsible ? () => setOpen((v) => !v) : undefined}
+          role={collapsible ? 'button' : undefined}
+          tabIndex={collapsible ? 0 : undefined}
+          onKeyDown={
+            collapsible
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpen((v) => !v);
+                  }
+                }
+              : undefined
+          }
+        >
+          {collapsible ? <span className={styles.collapseChevron}>{open ? '▾' : '▸'}</span> : null}
+          {group.label}
+        </div>
+        <div className="item-subtitle">{modelsCountLabel}</div>
+      </div>
+      {open && (
+        <div className={styles.modelTags}>
+          {group.items.map((model) => (
+            <span
+              key={`${model.name}-${model.alias ?? 'default'}`}
+              className={styles.modelTag}
+              title={model.description || ''}
+            >
+              <span className={styles.modelName}>{model.name}</span>
+              {model.alias && <span className={styles.modelAlias}>{model.alias}</span>}
+            </span>
+          ))}
+        </div>
+      )}
+      {collapsible && !open && (
+        <button type="button" className={styles.listToggle} onClick={() => setOpen(true)}>
+          {t('common.show_all_count', { defaultValue: 'Show all {{count}}', count })}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function SystemPage() {
   const { t, i18n } = useTranslation();
@@ -489,24 +558,11 @@ export function SystemPage() {
         ) : (
           <div className="item-list">
             {groupedModels.map((group) => (
-              <div key={group.id} className="item-row">
-                <div className="item-meta">
-                  <div className="item-title">{group.label}</div>
-                  <div className="item-subtitle">{t('system_info.models_count', { count: group.items.length })}</div>
-                </div>
-                <div className={styles.modelTags}>
-                  {group.items.map((model) => (
-                    <span
-                      key={`${model.name}-${model.alias ?? 'default'}`}
-                      className={styles.modelTag}
-                      title={model.description || ''}
-                    >
-                      <span className={styles.modelName}>{model.name}</span>
-                      {model.alias && <span className={styles.modelAlias}>{model.alias}</span>}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <ModelGroupRow
+                key={group.id}
+                group={group}
+                modelsCountLabel={t('system_info.models_count', { count: group.items.length })}
+              />
             ))}
           </div>
         )}
