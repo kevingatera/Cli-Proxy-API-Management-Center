@@ -461,6 +461,8 @@
 // Table (80%比例)
 .tableWrapper {
   overflow-x: auto;
+  max-height: 480px;
+  overflow-y: auto;
 }
 
 .table {
@@ -480,6 +482,9 @@
     color: var(--text-tertiary);
     background-color: var(--bg-secondary);
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 
   td {
@@ -609,6 +614,28 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+}
+
+// Shared "Show all / Show less" toggle for collapsed long lists.
+.listToggle {
+  display: block;
+  width: 100%;
+  margin-top: $spacing-sm;
+  padding: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--primary-color, #4f9cf9);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: var(--primary-color, #4f9cf9);
+    background: color-mix(in srgb, var(--primary-color, #4f9cf9) 6%, transparent);
+  }
 }
 
 .pricesGrid {

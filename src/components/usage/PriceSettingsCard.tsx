@@ -19,6 +19,8 @@ export interface PriceSettingsCardProps {
   onPricesChange: (prices: Record<string, ModelPrice>) => void;
 }
 
+const PRICE_COLLAPSE_LIMIT = 8;
+
 export function PriceSettingsCard({
   modelNames,
   modelPrices,
@@ -33,6 +35,7 @@ export function PriceSettingsCard({
   const [cachePrice, setCachePrice] = useState('');
   const [importingOpenRouter, setImportingOpenRouter] = useState(false);
   const [fetchingOpenRouter, setFetchingOpenRouter] = useState(false);
+  const [pricesExpanded, setPricesExpanded] = useState(false);
 
   const activeModelPrices = useMemo(
     () => keepOnlyUsedModelPrices(modelPrices, modelNames),
@@ -211,28 +214,43 @@ export function PriceSettingsCard({
         <div className={styles.pricesList}>
           <h4 className={styles.pricesTitle}>{t('usage_stats.saved_prices')}</h4>
           {Object.keys(activeModelPrices).length > 0 ? (
-            <div className={styles.pricesGrid}>
-              {(Object.entries(activeModelPrices) as Array<[string, ModelPrice]>).map(([model, price]) => (
-                <div key={model} className={styles.priceItem}>
-                  <div className={styles.priceInfo}>
-                    <span className={styles.priceModel}>{model}</span>
-                    <div className={styles.priceMeta}>
-                      <span>{t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M</span>
-                      <span>{t('usage_stats.model_price_completion')}: ${price.completion.toFixed(4)}/1M</span>
-                      <span>{t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M</span>
+            <>
+              <div className={styles.pricesGrid}>
+                {(Object.entries(activeModelPrices) as Array<[string, ModelPrice]>)
+                  .slice(0, pricesExpanded ? undefined : PRICE_COLLAPSE_LIMIT)
+                  .map(([model, price]) => (
+                    <div key={model} className={styles.priceItem}>
+                      <div className={styles.priceInfo}>
+                        <span className={styles.priceModel}>{model}</span>
+                        <div className={styles.priceMeta}>
+                          <span>{t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M</span>
+                          <span>{t('usage_stats.model_price_completion')}: ${price.completion.toFixed(4)}/1M</span>
+                          <span>{t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M</span>
+                        </div>
+                      </div>
+                      <div className={styles.priceActions}>
+                        <Button variant="secondary" size="sm" onClick={() => handleEditPrice(model)}>
+                          {t('common.edit')}
+                        </Button>
+                        <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
+                          {t('common.delete')}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.priceActions}>
-                    <Button variant="secondary" size="sm" onClick={() => handleEditPrice(model)}>
-                      {t('common.edit')}
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
-                      {t('common.delete')}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  ))}
+              </div>
+              {Object.keys(activeModelPrices).length > PRICE_COLLAPSE_LIMIT && (
+                <button
+                  type="button"
+                  className={styles.listToggle}
+                  onClick={() => setPricesExpanded((v) => !v)}
+                >
+                  {pricesExpanded
+                    ? t('common.show_less', { defaultValue: 'Show less' })
+                    : t('common.show_all_count', { defaultValue: 'Show all {{count}}', count: Object.keys(activeModelPrices).length })}
+                </button>
+              )}
+            </>
           ) : (
             <div className={styles.hint}>{t('usage_stats.model_price_empty')}</div>
           )}
