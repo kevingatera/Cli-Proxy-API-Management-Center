@@ -61,7 +61,7 @@
 
 .filtersGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 12px;
 
   :global(.form-group) {
@@ -75,6 +75,84 @@
   @include mobile {
     grid-template-columns: 1fr;
   }
+}
+
+.filtersBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filtersSearchRow {
+  :global(.form-group) {
+    margin: 0;
+  }
+
+  :global(.input) {
+    height: 40px;
+    box-sizing: border-box;
+  }
+}
+
+.filterHeaderBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.filterHeaderLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.filterHeaderMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterCountSummary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.filterActiveBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary-color, #4f9cf9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.filterChevron {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  transition: transform 0.15s ease;
+  transform: rotate(90deg);
+}
+
+.filterChevronOpen {
+  transform: rotate(-90deg);
 }
 
 .hint {

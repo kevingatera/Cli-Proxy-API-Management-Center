@@ -8,6 +8,10 @@ export type { SparklineData, SparklineBundle, UseSparklinesOptions, UseSparkline
 export { useChartData } from './hooks/useChartData';
 export type { UseChartDataOptions, UseChartDataReturn } from './hooks/useChartData';
 
+export { useAuthIndexLabels } from './hooks/useAuthIndexLabels';
+export type { UseAuthIndexLabelsReturn } from './hooks/useAuthIndexLabels';
+export { buildAuthLabel } from './hooks/useAuthIndexLabels';
+
 // Components
 export { StatCards } from './StatCards';
 export type { StatCardsProps } from './StatCards';

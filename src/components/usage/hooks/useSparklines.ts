@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { collectUsageDetails, extractTotalTokens } from '@/utils/usage';
+import { collectUsageDetails, extractTotalTokens, calculateCost, type ModelPrice } from '@/utils/usage';
 import type { UsagePayload } from './useUsageData';
 
 export interface SparklineData {
@@ -24,6 +24,7 @@ export interface SparklineBundle {
 export interface UseSparklinesOptions {
   usage: UsagePayload | null;
   loading: boolean;
+  modelPrices?: Record<string, ModelPrice>;
 }
 
 export interface UseSparklinesReturn {
@@ -34,9 +35,11 @@ export interface UseSparklinesReturn {
   costSparkline: SparklineBundle | null;
 }
 
-export function useSparklines({ usage, loading }: UseSparklinesOptions): UseSparklinesReturn {
+type SeriesMetric = 'requests' | 'tokens' | 'cost';
+
+export function useSparklines({ usage, loading, modelPrices }: UseSparklinesOptions): UseSparklinesReturn {
   const buildLastHourSeries = useCallback(
-    (metric: 'requests' | 'tokens'): { labels: string[]; data: number[] } => {
+    (metric: SeriesMetric): { labels: string[]; data: number[] } => {
       if (!usage) return { labels: [], data: [] };
       const details = collectUsageDetails(usage);
       if (!details.length) return { labels: [], data: [] };
@@ -45,6 +48,8 @@ export function useSparklines({ usage, loading }: UseSparklinesOptions): UseSpar
       const now = Date.now();
       const windowStart = now - windowMinutes * 60 * 1000;
       const buckets = new Array(windowMinutes).fill(0);
+
+      const prices = modelPrices && Object.keys(modelPrices).length > 0 ? modelPrices : null;
 
       details.forEach((detail) => {
         const timestamp = Date.parse(detail.timestamp);
@@ -55,7 +60,17 @@ export function useSparklines({ usage, loading }: UseSparklinesOptions): UseSpar
           windowMinutes - 1,
           Math.floor((timestamp - windowStart) / 60000)
         );
-        const increment = metric === 'tokens' ? extractTotalTokens(detail) : 1;
+        let increment = 0;
+        if (metric === 'tokens') {
+          increment = extractTotalTokens(detail);
+        } else if (metric === 'cost') {
+          // Cost is only meaningful when we have prices; otherwise treat as 0
+          // so the sparkline renders an honest flat line instead of mirroring
+          // the tokens trend.
+          increment = prices ? calculateCost(detail, prices) : 0;
+        } else {
+          increment = 1;
+        }
         buckets[minuteIndex] += increment;
       });
 
@@ -68,7 +83,7 @@ export function useSparklines({ usage, loading }: UseSparklinesOptions): UseSpar
 
       return { labels, data: buckets };
     },
-    [usage]
+    [usage, modelPrices]
   );
 
   const buildSparkline = useCallback(
@@ -124,7 +139,7 @@ export function useSparklines({ usage, loading }: UseSparklinesOptions): UseSpar
   );
 
   const costSparkline = useMemo(
-    () => buildSparkline(buildLastHourSeries('tokens'), '#f59e0b', 'rgba(245, 158, 11, 0.18)'),
+    () => buildSparkline(buildLastHourSeries('cost'), '#f59e0b', 'rgba(245, 158, 11, 0.18)'),
     [buildLastHourSeries, buildSparkline]
   );
 

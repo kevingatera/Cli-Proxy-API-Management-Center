@@ -27,7 +27,8 @@ import {
   PriceSettingsCard,
   useUsageData,
   useSparklines,
-  useChartData
+  useChartData,
+  useAuthIndexLabels
 } from '@/components/usage';
 import {
   DEFAULT_USAGE_FILTERS,
@@ -117,6 +118,11 @@ export function UsagePage() {
 
   useHeaderRefresh(loadUsage);
 
+  // Auth index -> friendly label map (email/filename) for the Auth Index filter.
+  // Built from the unfiltered payload so labels exist even for credentials
+  // that the current filter has hidden.
+  const { labelsByIndex: authIndexLabels } = useAuthIndexLabels(usage);
+
   // Chart lines state
   const [chartLines, setChartLines] = useState<string[]>(savedViewState.chartLines);
   const MAX_CHART_LINES = 9;
@@ -133,7 +139,7 @@ export function UsagePage() {
     rpmSparkline,
     tpmSparkline,
     costSparkline
-  } = useSparklines({ usage: usageForDisplay, loading });
+  } = useSparklines({ usage: usageForDisplay, loading, modelPrices });
 
   // Chart data hook
   const {
@@ -235,6 +241,7 @@ export function UsagePage() {
         totalRequests={usage?.total_requests ?? 0}
         onChange={setFilters}
         onReset={() => setFilters({ ...DEFAULT_USAGE_FILTERS })}
+        authIndexLabels={authIndexLabels}
       />
 
       {/* Stats Overview Cards */}

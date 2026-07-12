@@ -335,9 +335,81 @@ export function formatUsd(value: number): string {
 }
 
 /**
- * 从使用数据中收集所有请求明细
+ * Build a map of auth_index -> friendly label using the usage payload itself.
+ *
+ * The usage records carry `auth_id` (filename), `source` (often the email),
+ * and `provider` alongside the opaque `auth_index` hash. We prefer these
+ * embedded fields over a separate `/auth-files` lookup because the live
+ * auth_index values can drift from the historical ones in usage data
+ * (rotated/renamed credentials produce different seeds).
+ *
+ * Preference order per detail: source (email) > auth_id (filename, trimmed)
+ * > provider. First non-empty wins and is reused for all requests with the
+ * same auth_index.
+ */
+export function buildAuthIndexLabels(usageData: any): Map<string, string> {
+  const labels = new Map<string, string>();
+  if (!usageData || typeof usageData !== 'object') {
+    return labels;
+  }
+  const apis = usageData.apis || {};
+  Object.values(apis as Record<string, any>).forEach((apiEntry: any) => {
+    const models = apiEntry?.models || {};
+    Object.values(models as Record<string, any>).forEach((modelEntry: any) => {
+      const details = Array.isArray(modelEntry.details) ? modelEntry.details : [];
+      details.forEach((detail: any) => {
+        const idx = typeof detail?.auth_index === 'string' ? detail.auth_index.trim() : '';
+        if (!idx || labels.has(idx)) return;
+
+        const source = typeof detail?.source === 'string' ? detail.source.trim() : '';
+        if (source) {
+          // Source is often the email; strip any masking prefix the normalizer added.
+          const cleaned = source.replace(/^[kmt]:/, '');
+          labels.set(idx, cleaned);
+          return;
+        }
+
+        const authId = typeof detail?.auth_id === 'string' ? detail.auth_id.trim() : '';
+        if (authId) {
+          labels.set(idx, authId.replace(/\.json$/i, ''));
+          return;
+        }
+
+        const provider = typeof detail?.provider === 'string' ? detail.provider.trim() : '';
+        if (provider) {
+          labels.set(idx, provider);
+        }
+      });
+    });
+  });
+  return labels;
+}
+
+// Memoize detail collection per payload object. The payload is fetched once
+// and then reused across many derivations (sparklines, filters, charts, stats,
+// cost); without this we walk the whole tree ~14 times per render.
+const usageDetailsCache = new WeakMap<object, UsageDetail[]>();
+
+/**
+ * 收集使用数据中的所有请求明细（带缓存）
  */
 export function collectUsageDetails(usageData: any): UsageDetail[] {
+  if (!usageData || typeof usageData !== 'object') {
+    return [];
+  }
+  const cached = usageDetailsCache.get(usageData);
+  if (cached) {
+    return cached;
+  }
+  const details = collectUsageDetailsUncached(usageData);
+  usageDetailsCache.set(usageData, details);
+  return details;
+}
+
+/**
+ * 从使用数据中收集所有请求明细
+ */
+function collectUsageDetailsUncached(usageData: any): UsageDetail[] {
   if (!usageData) {
     return [];
   }
@@ -705,6 +777,15 @@ export function getModelNamesFromUsage(usageData: any): string[] {
 
 /**
  * 计算成本数据
+ *
+ * Token semantics (matches backend normaliseDetail in logger_plugin.go):
+ *   - input_tokens: prompt tokens, already inclusive of cached tokens
+ *     (true for OpenAI prompt_tokens and Anthropic input_tokens)
+ *   - output_tokens: completion tokens
+ *   - reasoning_tokens: thinking tokens, billed at the completion rate
+ *     (Anthropic extended-thinking, OpenAI o1/o3, DeepSeek-R1, etc.)
+ *   - cached_tokens / cache_tokens: cache-hit subset of input, billed at
+ *     the cache/discount rate instead of the full prompt rate
  */
 export function calculateCost(detail: any, modelPrices: Record<string, ModelPrice>): number {
   const modelName = detail.__modelName || '';
@@ -715,11 +796,13 @@ export function calculateCost(detail: any, modelPrices: Record<string, ModelPric
   const tokens = detail?.tokens || {};
   const rawInputTokens = Number(tokens.input_tokens);
   const rawCompletionTokens = Number(tokens.output_tokens);
+  const rawReasoningTokens = Number(tokens.reasoning_tokens);
   const rawCachedTokensPrimary = Number(tokens.cached_tokens);
   const rawCachedTokensAlternate = Number(tokens.cache_tokens);
 
   const inputTokens = Number.isFinite(rawInputTokens) ? Math.max(rawInputTokens, 0) : 0;
   const completionTokens = Number.isFinite(rawCompletionTokens) ? Math.max(rawCompletionTokens, 0) : 0;
+  const reasoningTokens = Number.isFinite(rawReasoningTokens) ? Math.max(rawReasoningTokens, 0) : 0;
   const cachedTokens = Math.max(
     Number.isFinite(rawCachedTokensPrimary) ? Math.max(rawCachedTokensPrimary, 0) : 0,
     Number.isFinite(rawCachedTokensAlternate) ? Math.max(rawCachedTokensAlternate, 0) : 0
@@ -728,7 +811,8 @@ export function calculateCost(detail: any, modelPrices: Record<string, ModelPric
 
   const promptCost = (promptTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.prompt) || 0);
   const cachedCost = (cachedTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.cache) || 0);
-  const completionCost = (completionTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.completion) || 0);
+  // Reasoning tokens are billed at the completion rate (same as output tokens).
+  const completionCost = ((completionTokens + reasoningTokens) / TOKENS_PER_PRICE_UNIT) * (Number(price.completion) || 0);
   const total = promptCost + cachedCost + completionCost;
   return Number.isFinite(total) && total > 0 ? total : 0;
 }
