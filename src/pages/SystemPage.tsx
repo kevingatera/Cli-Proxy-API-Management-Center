@@ -109,18 +109,24 @@ const extractChatResponseText = (payload: unknown): string => {
  * Groups with more than MODEL_GROUP_COLLAPSE_THRESHOLD tags collapse to just
  * the header (label + count) by default and expand on click. This keeps the
  * page readable when a group has dozens of tags (e.g. 131 GPT variants).
+ *
+ * The open/closed state is owned by the parent (SystemPage) via the
+ * expandedGroups set so that toggles survive re-renders even if the
+ * groupedModels array is recomputed.
  */
 function ModelGroupRow({
   group,
   modelsCountLabel,
+  open,
+  onToggle,
 }: {
   group: { id: string; label: string; items: { name: string; alias?: string; description?: string }[] };
   modelsCountLabel: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const count = group.items.length;
-  const initiallyOpen = count <= MODEL_GROUP_COLLAPSE_THRESHOLD;
-  const [open, setOpen] = useState(initiallyOpen);
   const collapsible = count > MODEL_GROUP_COLLAPSE_THRESHOLD;
 
   return (
@@ -128,7 +134,7 @@ function ModelGroupRow({
       <div className="item-meta">
         <div
           className={`item-title ${collapsible ? styles.clickableTitle : ''}`}
-          onClick={collapsible ? () => setOpen((v) => !v) : undefined}
+          onClick={collapsible ? onToggle : undefined}
           role={collapsible ? 'button' : undefined}
           tabIndex={collapsible ? 0 : undefined}
           onKeyDown={
@@ -136,7 +142,7 @@ function ModelGroupRow({
               ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setOpen((v) => !v);
+                    onToggle();
                   }
                 }
               : undefined
@@ -162,7 +168,7 @@ function ModelGroupRow({
         </div>
       )}
       {collapsible && !open && (
-        <button type="button" className={styles.listToggle} onClick={() => setOpen(true)}>
+        <button type="button" className={styles.listToggle} onClick={onToggle}>
           {t('common.show_all_count', { defaultValue: 'Show all {{count}}', count })}
         </button>
       )}
@@ -183,6 +189,20 @@ export function SystemPage() {
   const fetchModelsFromStore = useModelsStore((state) => state.fetchModels);
 
   const [modelStatus, setModelStatus] = useState<{ type: 'success' | 'warning' | 'error' | 'muted'; message: string }>();
+  // Track which large model groups the user has expanded. Small groups (<=
+  // MODEL_GROUP_COLLAPSE_THRESHOLD) are always open and not tracked here.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
   const [smokeTestModel, setSmokeTestModel] = useState('');
   const [smokeTestVariant, setSmokeTestVariant] = useState('');
   const [smokeTestPrompt, setSmokeTestPrompt] = useState(() => 'Reply with OK only.');
@@ -557,13 +577,19 @@ export function SystemPage() {
           <div className="hint">{t('system_info.models_empty')}</div>
         ) : (
           <div className="item-list">
-            {groupedModels.map((group) => (
-              <ModelGroupRow
-                key={group.id}
-                group={group}
-                modelsCountLabel={t('system_info.models_count', { count: group.items.length })}
-              />
-            ))}
+            {groupedModels.map((group) => {
+              const collapsible = group.items.length > MODEL_GROUP_COLLAPSE_THRESHOLD;
+              const open = !collapsible || expandedGroups.has(group.id);
+              return (
+                <ModelGroupRow
+                  key={group.id}
+                  group={group}
+                  modelsCountLabel={t('system_info.models_count', { count: group.items.length })}
+                  open={open}
+                  onToggle={() => toggleGroup(group.id)}
+                />
+              );
+            })}
           </div>
         )}
       </Card>
