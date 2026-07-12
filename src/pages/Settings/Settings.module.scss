@@ -182,6 +182,18 @@
   margin-bottom: $spacing-md;
 }
 
+// Live plain-English summary of the current policy.
+.policySummary {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-bg));
+  border-left: 3px solid var(--primary-color);
+  margin-bottom: $spacing-md;
+  color: var(--text-primary);
+}
+
 .policyTopRow {
   display: flex;
   gap: $spacing-md;
@@ -240,6 +252,48 @@
   justify-content: space-between;
   align-items: center;
   gap: $spacing-sm;
+}
+
+.routeHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.routeMoveBtn {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border-radius: $radius-sm;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// Unsaved-changes dot shown on the Save Policy button area
+.unsavedDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary-color, #4f9cf9);
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 // Sub-section headers inside the routing policy card. Groups the three

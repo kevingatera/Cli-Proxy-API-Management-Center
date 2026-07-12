@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -103,6 +103,10 @@ export function SettingsPage() {
   const [logsMaxTotalSizeMb, setLogsMaxTotalSizeMb] = useState(0);
   const [routingStrategy, setRoutingStrategy] = useState('round-robin');
   const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicyConfig>(createDefaultRoutingPolicy());
+  // Tracks the last successfully saved policy so we can show an unsaved-changes
+  // indicator on the Save button.
+  const savedPolicyRef = useRef<RoutingPolicyConfig>(createDefaultRoutingPolicy());
+  const routingPolicyDirty = JSON.stringify(normalizeRoutingPolicy(routingPolicy)) !== JSON.stringify(savedPolicyRef.current);
   const [routingPolicyAdvanced, setRoutingPolicyAdvanced] = useState(false);
   const [routingPolicyText, setRoutingPolicyText] = useState('');
   const [routingPreviewModel, setRoutingPreviewModel] = useState('gpt-5.4-mini');
@@ -179,6 +183,7 @@ export function SettingsPage() {
           const normalizedPolicy = normalizeRoutingPolicy(routingPolicyResult.value);
           setRoutingPolicy(normalizedPolicy);
           setRoutingPolicyText(JSON.stringify(normalizedPolicy, null, 2));
+          savedPolicyRef.current = normalizedPolicy;
           updateConfigValue('routing/policy', normalizedPolicy);
         }
         if (authFilesResult.status === 'fulfilled') {
@@ -415,6 +420,18 @@ export function SettingsPage() {
     });
   };
 
+  const moveRoute = (index: number, direction: -1 | 1) => {
+    updateRoutingPolicy((prev) => {
+      prev.defaults = prev.defaults || {};
+      const route = [...(prev.defaults.route || [])];
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= route.length) return prev;
+      [route[index], route[target]] = [route[target], route[index]];
+      prev.defaults.route = route;
+      return prev;
+    });
+  };
+
   const toggleFallbackTrigger = (trigger: string) => {
     updateRoutingPolicy((prev) => {
       prev.fallback = prev.fallback || { on: [] };
@@ -437,6 +454,7 @@ export function SettingsPage() {
     try {
       await configApi.updateRoutingPolicy(policyToSave);
       clearCache('routing/policy');
+      savedPolicyRef.current = policyToSave;
       showNotification('Routing policy updated', 'success');
     } catch (err: any) {
       setRoutingPolicy(previous);
@@ -484,6 +502,24 @@ export function SettingsPage() {
     routingStrategy === 'quota-aware'
       ? 'basic_settings.routing_strategy_hint_quota_aware'
       : 'basic_settings.routing_strategy_hint';
+
+  // Plain-English summary of the current policy state, shown at the top of the
+  // routing policy card so operators can see what's configured at a glance.
+  const policySummary = (() => {
+    if (!routingPolicy.enabled) {
+      return 'Policy routing is off. Requests use the strategy above (round-robin / fill-first / quota-aware) without explicit provider ordering.';
+    }
+    const routes = routingPolicy.defaults?.route || [];
+    const order = routes.map((r) => r.provider).filter(Boolean);
+    const fallbacks = routingPolicy.fallback?.on || [];
+    if (order.length === 0) {
+      return `Policy is enabled but no route steps are defined. All providers are tried in their natural order${fallbacks.length ? `, falling back on: ${fallbacks.join(', ')}` : ' with no automatic fallback'}.`;
+    }
+    const orderStr = order.join(' -> ');
+    const tail = routingPolicy.defaults?.includeRemainingProviders !== false ? ' + remaining' : '';
+    const fbStr = fallbacks.length ? `, falling back on: ${fallbacks.join(', ')}` : ', stopping on any error';
+    return `Try ${orderStr}${tail}${fbStr}.`;
+  })();
 
   return (
     <div className={`page-shell ${styles.container}`}>
@@ -586,6 +622,9 @@ export function SettingsPage() {
           <div className={styles.policyHint}>
             Control the order in which providers and credentials are tried, and which errors trigger an automatic fallback to the next candidate.
           </div>
+          <div className={styles.policySummary} role="status">
+            {policySummary}
+          </div>
           <div className={styles.policyTopRow}>
             <ToggleSwitch
               label="Enable policy routing"
@@ -615,7 +654,7 @@ export function SettingsPage() {
                   Load JSON Into Guided Form
                 </Button>
                 <Button onClick={handleRoutingPolicyUpdate} loading={pending.routingPolicy} disabled={disableControls || loading}>
-                  Save Policy
+                  Save Policy{routingPolicyDirty && <span className={styles.unsavedDot} title="Unsaved changes" />}
                 </Button>
               </div>
             </div>
@@ -651,9 +690,31 @@ export function SettingsPage() {
                       <div key={`${provider}-${index}`} className={styles.routeCard}>
                         <div className={styles.routeHeader}>
                           <strong>Route #{index + 1}</strong>
-                          <Button variant="secondary" onClick={() => removeRoute(index)} disabled={disableControls || loading}>
-                            Remove
-                          </Button>
+                          <div className={styles.routeHeaderActions}>
+                            <button
+                              type="button"
+                              className={styles.routeMoveBtn}
+                              onClick={() => moveRoute(index, -1)}
+                              disabled={disableControls || loading || index === 0}
+                              title="Move up"
+                              aria-label="Move route up"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.routeMoveBtn}
+                              onClick={() => moveRoute(index, 1)}
+                              disabled={disableControls || loading || index === (routingPolicy.defaults?.route || []).length - 1}
+                              title="Move down"
+                              aria-label="Move route down"
+                            >
+                              ↓
+                            </button>
+                            <Button variant="secondary" onClick={() => removeRoute(index)} disabled={disableControls || loading}>
+                              Remove
+                            </Button>
+                          </div>
                         </div>
                         <div className={styles.routeGrid}>
                           <div className="form-group">
@@ -779,7 +840,7 @@ export function SettingsPage() {
                     disabled={disableControls || loading}
                   />
                   <Button onClick={handleRoutingPolicyUpdate} loading={pending.routingPolicy} disabled={disableControls || loading}>
-                    Save Policy
+                    Save Policy{routingPolicyDirty && <span className={styles.unsavedDot} title="Unsaved changes" />}
                   </Button>
                 </div>
               </div>
