@@ -34,6 +34,27 @@ type PendingKey =
 
 const DEFAULT_FALLBACK_TRIGGERS = ['exhausted', 'rate_limited', 'server_error', 'transport_error'];
 
+// Human-readable descriptions for each fallback trigger, shown in the UI so
+// operators understand what each toggle does without reading the docs.
+const FALLBACK_TRIGGER_LABELS: Record<string, { label: string; hint: string }> = {
+  exhausted: {
+    label: 'exhausted',
+    hint: 'Credential has no remaining quota (e.g. plan limit reached). Fall back to the next candidate.',
+  },
+  rate_limited: {
+    label: 'rate_limited',
+    hint: 'Upstream returned 429 / rate-limit. Fall back instead of waiting out the cooldown.',
+  },
+  server_error: {
+    label: 'server_error',
+    hint: 'Upstream returned a 5xx response. Try the next credential.',
+  },
+  transport_error: {
+    label: 'transport_error',
+    hint: 'Network failure (timeout, connection reset, DNS). Try the next credential.',
+  },
+};
+
 const createDefaultRoutingPolicy = (): RoutingPolicyConfig => ({
   enabled: false,
   defaults: {
@@ -699,19 +720,32 @@ export function SettingsPage() {
               </div>
 
               <div className={styles.fallbackCard}>
-                <div className={styles.routeAuthHeading}>Fallback triggers</div>
+                <div className={styles.routeAuthHeading}>
+                  Fallback triggers
+                  <span className={styles.routeAuthHint}>
+                    When a credential fails with one of the selected errors, automatically try the next candidate in the route order.
+                  </span>
+                </div>
                 <div className={styles.fallbackRow}>
                   {DEFAULT_FALLBACK_TRIGGERS.map((trigger) => {
                     const checked = (routingPolicy.fallback?.on || []).includes(trigger);
+                    const meta = FALLBACK_TRIGGER_LABELS[trigger] || { label: trigger, hint: '' };
                     return (
-                      <label key={trigger} className={styles.fallbackItem}>
+                      <label
+                        key={trigger}
+                        className={styles.fallbackItem}
+                        title={meta.hint}
+                      >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleFallbackTrigger(trigger)}
                           disabled={disableControls || loading}
                         />
-                        <span>{trigger}</span>
+                        <span className={styles.fallbackItemText}>
+                          <span className={styles.fallbackItemLabel}>{meta.label}</span>
+                          <span className={styles.fallbackItemHint}>{meta.hint}</span>
+                        </span>
                       </label>
                     );
                   })}
