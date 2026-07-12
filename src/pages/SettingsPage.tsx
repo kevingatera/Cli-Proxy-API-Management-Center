@@ -582,9 +582,9 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <Card title="Routing Policy">
+        <Card title="Routing Policy" className={styles.fullWidth}>
           <div className={styles.policyHint}>
-            Configure provider/auth ordering and fallback triggers. Use guided controls by default, or switch to JSON.
+            Control the order in which providers and credentials are tried, and which errors trigger an automatic fallback to the next candidate.
           </div>
           <div className={styles.policyTopRow}>
             <ToggleSwitch
@@ -621,110 +621,120 @@ export function SettingsPage() {
             </div>
           ) : (
             <div className={styles.policyGuided}>
-              <ToggleSwitch
-                label="Include unspecified providers after listed route order"
-                checked={routingPolicy.defaults?.includeRemainingProviders !== false}
-                disabled={disableControls || loading}
-                onChange={(value) =>
-                  updateRoutingPolicy((prev) => ({
-                    ...prev,
-                    defaults: {
-                      ...(prev.defaults || {}),
-                      includeRemainingProviders: value,
-                    },
-                  }))
-                }
-              />
-
-              <div className={styles.routeList}>
-                {(routingPolicy.defaults?.route || []).map((route, index) => {
-                  const provider = String(route.provider || '').trim().toLowerCase();
-                  const availableAuthIds = providerAuthIds[provider] || [];
-                  return (
-                    <div key={`${provider}-${index}`} className={styles.routeCard}>
-                      <div className={styles.routeHeader}>
-                        <strong>Route #{index + 1}</strong>
-                        <Button variant="secondary" onClick={() => removeRoute(index)} disabled={disableControls || loading}>
-                          Remove
-                        </Button>
-                      </div>
-                      <div className={styles.routeGrid}>
-                        <div className="form-group">
-                          <label>Provider</label>
-                          <select
-                            className="input"
-                            value={provider}
-                            onChange={(e) => setRouteProvider(index, e.target.value)}
+              {/* Step 1: Route order */}
+              <div className={styles.policySubSection}>
+                <div>
+                  <p className={styles.policySubHeading}>1. Route order</p>
+                  <p className={styles.policySubHint}>
+                    List providers in the order they should be tried. Within each provider, click auth files to pin a preferred credential order. Unlisted providers are appended automatically when the toggle below is on.
+                  </p>
+                </div>
+                <ToggleSwitch
+                  label="Include unspecified providers after listed route order"
+                  checked={routingPolicy.defaults?.includeRemainingProviders !== false}
+                  disabled={disableControls || loading}
+                  onChange={(value) =>
+                    updateRoutingPolicy((prev) => ({
+                      ...prev,
+                      defaults: {
+                        ...(prev.defaults || {}),
+                        includeRemainingProviders: value,
+                      },
+                    }))
+                  }
+                />
+                <div className={styles.routeList}>
+                  {(routingPolicy.defaults?.route || []).map((route, index) => {
+                    const provider = String(route.provider || '').trim().toLowerCase();
+                    const availableAuthIds = providerAuthIds[provider] || [];
+                    return (
+                      <div key={`${provider}-${index}`} className={styles.routeCard}>
+                        <div className={styles.routeHeader}>
+                          <strong>Route #{index + 1}</strong>
+                          <Button variant="secondary" onClick={() => removeRoute(index)} disabled={disableControls || loading}>
+                            Remove
+                          </Button>
+                        </div>
+                        <div className={styles.routeGrid}>
+                          <div className="form-group">
+                            <label>Provider</label>
+                            <select
+                              className="input"
+                              value={provider}
+                              onChange={(e) => setRouteProvider(index, e.target.value)}
+                              disabled={disableControls || loading}
+                            >
+                              <option value="">Select provider</option>
+                              {providerOptions.map((item) => (
+                                <option key={item} value={item}>
+                                  {item}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <ToggleSwitch
+                            label="Append remaining auths for this provider"
+                            checked={route.includeRemainingAuth !== false}
                             disabled={disableControls || loading}
-                          >
-                            <option value="">Select provider</option>
-                            {providerOptions.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) =>
+                              updateRoutingPolicy((prev) => {
+                                const nextRoute = [...(prev.defaults?.route || [])];
+                                if (!nextRoute[index]) return prev;
+                                nextRoute[index] = {
+                                  ...nextRoute[index],
+                                  includeRemainingAuth: value,
+                                };
+                                return {
+                                  ...prev,
+                                  defaults: { ...(prev.defaults || {}), route: nextRoute },
+                                };
+                              })
+                            }
+                          />
                         </div>
-                        <ToggleSwitch
-                          label="Append remaining auths for this provider"
-                          checked={route.includeRemainingAuth !== false}
-                          disabled={disableControls || loading}
-                          onChange={(value) =>
-                            updateRoutingPolicy((prev) => {
-                              const nextRoute = [...(prev.defaults?.route || [])];
-                              if (!nextRoute[index]) return prev;
-                              nextRoute[index] = {
-                                ...nextRoute[index],
-                                includeRemainingAuth: value,
-                              };
-                              return {
-                                ...prev,
-                                defaults: { ...(prev.defaults || {}), route: nextRoute },
-                              };
-                            })
-                          }
-                        />
-                      </div>
-                      <div className={styles.routeAuthSection}>
-                        <div className={styles.routeAuthHeading}>Auth order (click to add/remove):</div>
-                        <div className={styles.routeAuthPills}>
-                          {availableAuthIds.length === 0 ? (
-                            <span className={styles.routeAuthEmpty}>No auth IDs found for this provider</span>
-                          ) : (
-                            availableAuthIds.map((authId) => {
-                              const selected = (route.authOrder || []).includes(authId);
-                              return (
-                                <button
-                                  key={authId}
-                                  type="button"
-                                  className={selected ? styles.routeAuthPillSelected : styles.routeAuthPill}
-                                  onClick={() => toggleRouteAuthOrder(index, authId)}
-                                  disabled={disableControls || loading}
-                                >
-                                  {authId}
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                        <div className={styles.routeAuthCurrent}>
-                          Ordered: {(route.authOrder || []).length ? (route.authOrder || []).join(' -> ') : 'none'}
+                        <div className={styles.routeAuthSection}>
+                          <div className={styles.routeAuthHeading}>Auth order (click to add/remove):</div>
+                          <div className={styles.routeAuthPills}>
+                            {availableAuthIds.length === 0 ? (
+                              <span className={styles.routeAuthEmpty}>No auth IDs found for this provider</span>
+                            ) : (
+                              availableAuthIds.map((authId) => {
+                                const selected = (route.authOrder || []).includes(authId);
+                                return (
+                                  <button
+                                    key={authId}
+                                    type="button"
+                                    className={selected ? styles.routeAuthPillSelected : styles.routeAuthPill}
+                                    onClick={() => toggleRouteAuthOrder(index, authId)}
+                                    disabled={disableControls || loading}
+                                    title={authId}
+                                  >
+                                    {authId}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                          <div className={styles.routeAuthCurrent}>
+                            Ordered: {(route.authOrder || []).length ? (route.authOrder || []).join(' -> ') : 'none'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-                <Button variant="secondary" onClick={addRoute} disabled={disableControls || loading}>
-                  Add Route Step
-                </Button>
+                    );
+                  })}
+                  <Button variant="secondary" onClick={addRoute} disabled={disableControls || loading}>
+                    Add Route Step
+                  </Button>
+                </div>
               </div>
 
-              <div className={styles.fallbackCard}>
-                <div className={styles.routeAuthHeading}>
-                  Fallback triggers
-                  <span className={styles.routeAuthHint}>
-                    When a credential fails with one of the selected errors, automatically try the next candidate in the route order.
-                  </span>
+              {/* Step 2: Fallback behavior */}
+              <div className={styles.policySubSection}>
+                <div>
+                  <p className={styles.policySubHeading}>2. Fallback behavior</p>
+                  <p className={styles.policySubHint}>
+                    When a credential fails with one of the selected errors, automatically advance to the next candidate in the route order. Clear a checkbox to stop on that error class instead.
+                  </p>
                 </div>
                 <div className={styles.fallbackRow}>
                   {DEFAULT_FALLBACK_TRIGGERS.map((trigger) => {
@@ -750,108 +760,110 @@ export function SettingsPage() {
                     );
                   })}
                 </div>
-              </div>
-
-              <div className={styles.policyBottomRow}>
-                <Input
-                  label="Trace retention limit"
-                  type="number"
-                  min={0}
-                  max={2000}
-                  value={routingPolicy.observability?.traceLimit ?? 200}
-                  onChange={(e) =>
-                    updateRoutingPolicy((prev) => ({
-                      ...prev,
-                      observability: {
-                        ...(prev.observability || {}),
-                        traceLimit: Number(e.target.value),
-                      },
-                    }))
-                  }
-                  disabled={disableControls || loading}
-                />
-                <Button onClick={handleRoutingPolicyUpdate} loading={pending.routingPolicy} disabled={disableControls || loading}>
-                  Save Policy
-                </Button>
+                <div className={styles.policyBottomRow}>
+                  <Input
+                    label="Trace retention limit (0-2000)"
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={routingPolicy.observability?.traceLimit ?? 200}
+                    onChange={(e) =>
+                      updateRoutingPolicy((prev) => ({
+                        ...prev,
+                        observability: {
+                          ...(prev.observability || {}),
+                          traceLimit: Number(e.target.value),
+                        },
+                      }))
+                    }
+                    disabled={disableControls || loading}
+                  />
+                  <Button onClick={handleRoutingPolicyUpdate} loading={pending.routingPolicy} disabled={disableControls || loading}>
+                    Save Policy
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
-          <div className={styles.previewSection}>
-            <div className={styles.previewHeader}>
-              <strong>Routing Preview</strong>
+          {/* Step 3: Test & observe */}
+          <div className={styles.policySubSection}>
+            <div>
+              <p className={styles.policySubHeading}>3. Test &amp; observe</p>
+              <p className={styles.policySubHint}>
+                Preview the resolved route for a model, and review recent live traces to confirm fallbacks fire as intended.
+              </p>
             </div>
-            <div className={styles.retryRow}>
-              <Input
-                label="Model"
-                value={routingPreviewModel}
-                onChange={(e) => setRoutingPreviewModel(e.target.value)}
-                disabled={disableControls || loading}
-                className={styles.retryInput}
-              />
-              <Button onClick={handleRoutingPreview} loading={pending.routingPreview} disabled={disableControls || loading}>
-                Preview
-              </Button>
-            </div>
-            {routingPreviewError && <div className="error-box">{routingPreviewError}</div>}
-            {routingPreview && (
-              <div className={styles.previewResult}>
-                <div>Strategy: {routingPreview.strategy}</div>
-                <div>Policy enabled: {routingPreview.policyEnabled ? 'yes' : 'no'}</div>
-                <div>Ordered providers: {(routingPreview.orderedProviders || []).join(' -> ') || 'none'}</div>
-                {(routingPreview.providerDetails || []).map((detail) => (
-                  <div key={detail.provider} className={styles.previewProviderRow}>
-                    <strong>{detail.provider}</strong>
-                    <span>Auth order: {(detail.authOrder || []).join(' -> ') || 'auto'}</span>
-                    <span>Available auths: {(detail.availableAuthIds || []).join(', ') || 'none'}</span>
-                  </div>
-                ))}
+            <div className={styles.previewSection}>
+              <div className={styles.retryRow}>
+                <Input
+                  label="Model"
+                  value={routingPreviewModel}
+                  onChange={(e) => setRoutingPreviewModel(e.target.value)}
+                  disabled={disableControls || loading}
+                  className={styles.retryInput}
+                />
+                <Button onClick={handleRoutingPreview} loading={pending.routingPreview} disabled={disableControls || loading}>
+                  Preview
+                </Button>
               </div>
-            )}
-          </div>
-
-          <div className={styles.tracesSection}>
-            <div className={styles.previewHeader}>
-              <strong>Recent Routing Traces</strong>
-            </div>
-            <div className={styles.policyTopRow}>
-              <ToggleSwitch
-                label="Failed only"
-                checked={routingTraceFailedOnly}
-                disabled={disableControls || loading}
-                onChange={(value) => {
-                  setRoutingTraceFailedOnly(value);
-                  refreshRoutingTraces(value);
-                }}
-              />
-              <Button onClick={() => refreshRoutingTraces(routingTraceFailedOnly)} loading={pending.routingTraces} disabled={disableControls || loading}>
-                Refresh Traces
-              </Button>
-            </div>
-            <div className={styles.traceList}>
-              {routingTraces.length === 0 ? (
-                <div className={styles.routeAuthEmpty}>No traces yet</div>
-              ) : (
-                routingTraces.map((trace) => (
-                  <div key={trace.id} className={styles.traceCard}>
-                    <div className={styles.traceHead}>
-                      <strong>{trace.model}</strong>
-                      <span>{trace.operation}</span>
-                      <span>{trace.finalStatus}</span>
+              {routingPreviewError && <div className="error-box">{routingPreviewError}</div>}
+              {routingPreview && (
+                <div className={styles.previewResult}>
+                  <div>Strategy: {routingPreview.strategy}</div>
+                  <div>Policy enabled: {routingPreview.policyEnabled ? 'yes' : 'no'}</div>
+                  <div>Ordered providers: {(routingPreview.orderedProviders || []).join(' -> ') || 'none'}</div>
+                  {(routingPreview.providerDetails || []).map((detail) => (
+                    <div key={detail.provider} className={styles.previewProviderRow}>
+                      <strong>{detail.provider}</strong>
+                      <span>Auth order: {(detail.authOrder || []).join(' -> ') || 'auto'}</span>
+                      <span>Available auths: {(detail.availableAuthIds || []).join(', ') || 'none'}</span>
                     </div>
-                    <div className={styles.traceMeta}>
-                      Providers: {(trace.orderedProviders || trace.providers || []).join(' -> ')}
-                    </div>
-                    <div className={styles.traceMeta}>
-                      Attempts:{' '}
-                      {(trace.attempts || [])
-                        .map((attempt) => `${attempt.provider}/${attempt.authId || 'auto'}:${attempt.success ? 'ok' : 'err'}`)
-                        .join(', ') || 'none'}
-                    </div>
-                    {trace.error && <div className={styles.traceError}>Error: {trace.error}</div>}
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+            </div>
+
+            <div className={styles.tracesSection}>
+              <div className={styles.policyTopRow}>
+                <ToggleSwitch
+                  label="Failed only"
+                  checked={routingTraceFailedOnly}
+                  disabled={disableControls || loading}
+                  onChange={(value) => {
+                    setRoutingTraceFailedOnly(value);
+                    refreshRoutingTraces(value);
+                  }}
+                />
+                <Button onClick={() => refreshRoutingTraces(routingTraceFailedOnly)} loading={pending.routingTraces} disabled={disableControls || loading}>
+                  Refresh Traces
+                </Button>
+              </div>
+              <div className={styles.traceList}>
+                {routingTraces.length === 0 ? (
+                  <div className={styles.routeAuthEmpty}>No traces yet. Send a request through the proxy to see how routing decisions are made.</div>
+                ) : (
+                  routingTraces.map((trace) => (
+                    <div key={trace.id} className={styles.traceCard}>
+                      <div className={styles.traceHead}>
+                        <strong>{trace.model}</strong>
+                        <span>{trace.operation}</span>
+                        <span>{trace.finalStatus}</span>
+                      </div>
+                      <div className={styles.traceMeta}>
+                        Providers: {(trace.orderedProviders || trace.providers || []).join(' -> ')}
+                      </div>
+                      <div className={styles.traceMeta}>
+                        Attempts:{' '}
+                        {(trace.attempts || [])
+                          .map((attempt) => `${attempt.provider}/${attempt.authId || 'auto'}:${attempt.success ? 'ok' : 'err'}`)
+                          .join(', ') || 'none'}
+                      </div>
+                      {trace.error && <div className={styles.traceError}>Error: {trace.error}</div>}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </Card>
