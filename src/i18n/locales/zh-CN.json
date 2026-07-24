@@ -1626,7 +1626,8 @@
     "weekday_wed": "三",
     "weekday_thu": "四",
     "weekday_fri": "五",
-    "weekday_sat": "六"
+    "weekday_sat": "六",
+    "last_updated": "更新于 {{time}}"
   },
   "plugin_management": {
     "title": "插件管理",
@@ -1842,7 +1843,20 @@
     "smoke_test_timeout": "冒烟测试已超时（{{seconds}} 秒）",
     "smoke_test_empty_result": "请求成功，但未返回可显示的助手文本。",
     "smoke_test_status_code": "HTTP {{status}}",
-    "smoke_test_resolved_model": "实际模型：{{model}}"
+    "smoke_test_resolved_model": "实际模型：{{model}}",
+    "smoke_test_finish_reason": "结束原因",
+    "smoke_test_prompt_tokens": "输入",
+    "smoke_test_completion_tokens": "输出",
+    "smoke_test_total_tokens": "合计",
+    "smoke_test_cached_tokens": "缓存",
+    "smoke_test_reasoning_tokens": "推理",
+    "smoke_test_tab_response": "响应",
+    "smoke_test_tab_raw": "原始",
+    "smoke_test_tab_headers": "请求头",
+    "smoke_test_tab_curl": "cURL",
+    "smoke_test_no_headers": "无请求头。",
+    "smoke_test_history_title": "最近运行",
+    "smoke_test_history_clear": "清空"
   },
   "notification": {
     "trusted_proxies_restart_required": "可信代理配置已保存，重启后端后生效。",

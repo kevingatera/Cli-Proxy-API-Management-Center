@@ -1627,7 +1627,8 @@
     "weekday_wed": "Wed",
     "weekday_thu": "Thu",
     "weekday_fri": "Fri",
-    "weekday_sat": "Sat"
+    "weekday_sat": "Sat",
+    "last_updated": "Updated {{time}}"
   },
   "plugin_management": {
     "title": "Plugin Management",
@@ -1843,7 +1844,20 @@
     "smoke_test_timeout": "Smoke test timed out after {{seconds}} seconds",
     "smoke_test_empty_result": "The request succeeded but returned no assistant text.",
     "smoke_test_status_code": "HTTP {{status}}",
-    "smoke_test_resolved_model": "Resolved model: {{model}}"
+    "smoke_test_resolved_model": "Resolved model: {{model}}",
+    "smoke_test_finish_reason": "finish",
+    "smoke_test_prompt_tokens": "Prompt",
+    "smoke_test_completion_tokens": "Completion",
+    "smoke_test_total_tokens": "Total",
+    "smoke_test_cached_tokens": "Cached",
+    "smoke_test_reasoning_tokens": "Reasoning",
+    "smoke_test_tab_response": "Response",
+    "smoke_test_tab_raw": "Raw",
+    "smoke_test_tab_headers": "Headers",
+    "smoke_test_tab_curl": "cURL",
+    "smoke_test_no_headers": "No headers.",
+    "smoke_test_history_title": "Recent runs",
+    "smoke_test_history_clear": "Clear"
   },
   "notification": {
     "trusted_proxies_restart_required": "Trusted proxy settings saved. Restart the backend to apply them.",
