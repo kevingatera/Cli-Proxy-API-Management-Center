@@ -230,6 +230,49 @@ const fetchAntigravityQuota = async (
   throw createStatusError(lastError || t('common.unknown_error'), priorityStatus ?? lastStatus);
 };
 
+// Codex rate-limit window sizes, in seconds. The upstream ChatGPT usage endpoint
+// reports `limit_window_seconds` for each window; we read that field to pick a
+// label rather than relying on the position of the window in the payload. When
+// OpenAI temporarily disables the 5-hour limit, the weekly window takes its
+// place at the same position and would otherwise be mis-labeled as "5-hour".
+const CODEX_FIVE_HOUR_LIMIT_SECONDS = 5 * 60 * 60;
+const CODEX_WEEKLY_LIMIT_SECONDS = 7 * 24 * 60 * 60;
+// Tolerance: enough to absorb any clock skew or rounding the upstream applies,
+// but tight enough to keep a 3-day or monthly window from matching the 5h label.
+const CODEX_WINDOW_MATCH_TOLERANCE_SECONDS = 30 * 60;
+
+const resolveCodexWindowLengthSeconds = (window?: CodexUsageWindow | null): number | null => {
+  if (!window) return null;
+  const explicit = normalizeNumberValue(window.limit_window_seconds ?? window.limitWindowSeconds);
+  if (explicit !== null && explicit > 0) return explicit;
+  // Fallback: derive from reset_after_seconds when the explicit limit is missing.
+  // Weekly windows report a 7-day reset even when limit_window_seconds is absent.
+  const resetAfter = normalizeNumberValue(window.reset_after_seconds ?? window.resetAfterSeconds);
+  if (resetAfter !== null && resetAfter > 0) return resetAfter;
+  return null;
+};
+
+const codexWindowLabelKey = (window?: CodexUsageWindow | null): string => {
+  const lengthSeconds = resolveCodexWindowLengthSeconds(window);
+  if (lengthSeconds !== null) {
+    if (
+      Math.abs(lengthSeconds - CODEX_FIVE_HOUR_LIMIT_SECONDS) <=
+      CODEX_WINDOW_MATCH_TOLERANCE_SECONDS
+    ) {
+      return 'codex_quota.primary_window';
+    }
+    if (
+      Math.abs(lengthSeconds - CODEX_WEEKLY_LIMIT_SECONDS) <=
+      CODEX_WINDOW_MATCH_TOLERANCE_SECONDS
+    ) {
+      return 'codex_quota.secondary_window';
+    }
+  }
+  // Unknown window length: keep the historical 5-hour label so existing users
+  // see no regression. OpenAI has only ever shipped 5h and weekly windows.
+  return 'codex_quota.primary_window';
+};
+
 const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): CodexQuotaWindow[] => {
   const rateLimit = payload.rate_limit ?? payload.rateLimit ?? undefined;
   const codeReviewLimit = payload.code_review_rate_limit ?? payload.codeReviewRateLimit ?? undefined;
@@ -237,7 +280,6 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
 
   const addWindow = (
     id: string,
-    labelKey: string,
     window?: CodexUsageWindow | null,
     limitReached?: boolean,
     allowed?: boolean
@@ -247,6 +289,7 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
     const usedPercentRaw = normalizeNumberValue(window.used_percent ?? window.usedPercent);
     const isLimitReached = Boolean(limitReached) || allowed === false;
     const usedPercent = usedPercentRaw ?? (isLimitReached && resetLabel !== '-' ? 100 : null);
+    const labelKey = codexWindowLabelKey(window);
     windows.push({
       id,
       label: t(labelKey),
@@ -258,21 +301,18 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
 
   addWindow(
     'primary',
-    'codex_quota.primary_window',
     rateLimit?.primary_window ?? rateLimit?.primaryWindow,
     rateLimit?.limit_reached ?? rateLimit?.limitReached,
     rateLimit?.allowed
   );
   addWindow(
     'secondary',
-    'codex_quota.secondary_window',
     rateLimit?.secondary_window ?? rateLimit?.secondaryWindow,
     rateLimit?.limit_reached ?? rateLimit?.limitReached,
     rateLimit?.allowed
   );
   addWindow(
     'code-review',
-    'codex_quota.code_review_window',
     codeReviewLimit?.primary_window ?? codeReviewLimit?.primaryWindow,
     codeReviewLimit?.limit_reached ?? codeReviewLimit?.limitReached,
     codeReviewLimit?.allowed
