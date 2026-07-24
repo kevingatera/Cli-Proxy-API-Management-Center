@@ -1066,11 +1066,12 @@
   },
   "quota_management": {
     "title": "Quota Management",
-    "description": "Monitor OAuth quota status for Antigravity, Codex, Claude, Kimi, and xAI credentials.",
+    "description": "Monitor OAuth quota status for Antigravity, Codex, Claude, Cursor, OpenCode Zen, Kimi, and xAI credentials.",
     "refresh_all_credentials": "Refresh all credentials",
     "station_keeping_label": "Station keeping",
     "station_keeping_hint": "Auto-refresh quota status to catch weekly resets.",
-    "station_keeping_toggle_label": "Toggle station keeping"
+    "station_keeping_toggle_label": "Toggle station keeping",
+    "last_updated": "Updated {{time}}"
   },
   "plugin_management": {
     "title": "Plugin Management",
@@ -1286,7 +1287,20 @@
     "smoke_test_timeout": "Smoke test timed out after {{seconds}} seconds",
     "smoke_test_empty_result": "The request succeeded but returned no assistant text.",
     "smoke_test_status_code": "HTTP {{status}}",
-    "smoke_test_resolved_model": "Resolved model: {{model}}"
+    "smoke_test_resolved_model": "Resolved model: {{model}}",
+    "smoke_test_finish_reason": "finish",
+    "smoke_test_prompt_tokens": "Prompt",
+    "smoke_test_completion_tokens": "Completion",
+    "smoke_test_total_tokens": "Total",
+    "smoke_test_cached_tokens": "Cached",
+    "smoke_test_reasoning_tokens": "Reasoning",
+    "smoke_test_tab_response": "Response",
+    "smoke_test_tab_raw": "Raw",
+    "smoke_test_tab_headers": "Headers",
+    "smoke_test_tab_curl": "cURL",
+    "smoke_test_no_headers": "No headers.",
+    "smoke_test_history_title": "Recent runs",
+    "smoke_test_history_clear": "Clear"
   },
   "notification": {
     "request_log_updated": "Request logging setting updated",
@@ -1608,6 +1622,7 @@
     "missing_auth_index": "Auth file missing auth_index",
     "empty_usage": "No usage telemetry yet for this credential.",
     "last_seen_never": "no telemetry yet",
+    "fetcher_pending": "Usage telemetry fetcher is not yet wired for this credential. The card will populate once the fetcher is ported.",
     "refresh_button": "Refresh Usage",
     "fetch_all": "Fetch All",
     "health_label": "Observed success rate",
@@ -1629,6 +1644,7 @@
     "missing_api_key": "Zen entry missing API key",
     "empty_usage": "No Zen usage telemetry yet for this key.",
     "last_seen_never": "no telemetry yet",
+    "fetcher_pending": "Usage telemetry fetcher is not yet wired for this key. The card will populate once the fetcher is ported.",
     "refresh_button": "Refresh Usage",
     "fetch_all": "Fetch All",
     "health_label": "Observed success rate",

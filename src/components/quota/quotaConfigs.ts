@@ -1887,7 +1887,7 @@ export const XAI_CONFIG: QuotaConfig<XaiQuotaState, XaiBillingSummary> = {
 // re-add the configs. The full fetcher and renderer code lives in a follow-up
 // commit; this commit wires the store + types so the UI doesn't error.
 
-const emptyCursorSummary = (): CursorUsageSummary => ({
+const emptyUsageSummary = (): CursorUsageSummary => ({
   requests: 0,
   successCount: 0,
   failureCount: 0,
@@ -1906,7 +1906,7 @@ const fetchCursorQuota = async (_file: AuthFileItem, t: TFunction): Promise<Curs
   // by authIndex. Until that is ported, return an empty summary so the card
   // renders its "no telemetry yet" state instead of erroring.
   void t;
-  return emptyCursorSummary();
+  return emptyUsageSummary();
 };
 
 const renderCursorItems = (
@@ -1916,7 +1916,7 @@ const renderCursorItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h, Fragment } = React;
-  const summary = quota.summary ?? emptyCursorSummary();
+  const summary = quota.summary ?? emptyUsageSummary();
   const hasTelemetry = summary.requests > 0;
   const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
   const lastSeenLabel = summary.lastSeenAt
@@ -1935,23 +1935,32 @@ const renderCursorItems = (
         h(
           'div',
           { className: styleMap.quotaMeta },
-          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h(
+            'span',
+            { className: styleMap.quotaPercent },
+            hasTelemetry ? `${successPct}%` : '--'
+          ),
           h('span', { className: styleMap.quotaReset }, lastSeenLabel)
         )
       ),
-      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
+      h(
+        QuotaProgressBar,
+        { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
+      )
     ),
     h(
       'div',
       { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
-      hasTelemetry ? t('cursor_quota.telemetry_note') : t('cursor_quota.empty_usage')
+      hasTelemetry
+        ? t('cursor_quota.telemetry_note')
+        : t('cursor_quota.fetcher_pending')
     )
   );
 };
 
 const fetchZenQuota = async (_file: AuthFileItem, t: TFunction): Promise<ZenUsageSummary> => {
   void t;
-  return emptyCursorSummary();
+  return emptyUsageSummary();
 };
 
 const renderZenItems = (
@@ -1961,7 +1970,7 @@ const renderZenItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h, Fragment } = React;
-  const summary = quota.summary ?? emptyCursorSummary();
+  const summary = quota.summary ?? emptyUsageSummary();
   const hasTelemetry = summary.requests > 0;
   const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
   const lastSeenLabel = summary.lastSeenAt
@@ -1980,16 +1989,25 @@ const renderZenItems = (
         h(
           'div',
           { className: styleMap.quotaMeta },
-          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h(
+            'span',
+            { className: styleMap.quotaPercent },
+            hasTelemetry ? `${successPct}%` : '--'
+          ),
           h('span', { className: styleMap.quotaReset }, lastSeenLabel)
         )
       ),
-      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
+      h(
+        QuotaProgressBar,
+        { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
+      )
     ),
     h(
       'div',
       { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
-      hasTelemetry ? t('zen_quota.telemetry_note') : t('zen_quota.empty_usage')
+      hasTelemetry
+        ? t('zen_quota.telemetry_note')
+        : t('zen_quota.fetcher_pending')
     )
   );
 };
@@ -2001,11 +2019,11 @@ export const CURSOR_CONFIG: QuotaConfig<CursorQuotaState, CursorUsageSummary> = 
   fetchQuota: fetchCursorQuota,
   storeSelector: (state) => state.cursorQuota,
   storeSetter: 'setCursorQuota',
-  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildLoadingState: () => ({ status: 'loading', summary: emptyUsageSummary() }),
   buildSuccessState: (summary) => ({ status: 'success', summary }),
   buildErrorState: (message, status) => ({
     status: 'error',
-    summary: emptyCursorSummary(),
+    summary: emptyUsageSummary(),
     error: message,
     errorStatus: status,
   }),
@@ -2017,15 +2035,15 @@ export const CURSOR_CONFIG: QuotaConfig<CursorQuotaState, CursorUsageSummary> = 
 export const ZEN_CONFIG: QuotaConfig<ZenQuotaState, ZenUsageSummary> = {
   type: 'opencode-go',
   i18nPrefix: 'zen_quota',
-  filterFn: (file) => isZenFile(file),
+  filterFn: (file) => isZenFile(file) && !isDisabledAuthFile(file),
   fetchQuota: fetchZenQuota,
   storeSelector: (state) => state.zenQuota,
   storeSetter: 'setZenQuota',
-  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildLoadingState: () => ({ status: 'loading', summary: emptyUsageSummary() }),
   buildSuccessState: (summary) => ({ status: 'success', summary }),
   buildErrorState: (message, status) => ({
     status: 'error',
-    summary: emptyCursorSummary(),
+    summary: emptyUsageSummary(),
     error: message,
     errorStatus: status,
   }),

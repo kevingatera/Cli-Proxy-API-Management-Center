@@ -1070,7 +1070,8 @@
     "refresh_all_credentials": "刷新全部凭证",
     "station_keeping_label": "配额保活",
     "station_keeping_hint": "自动刷新配额状态以捕捉周期性重置。",
-    "station_keeping_toggle_label": "切换配额保活"
+    "station_keeping_toggle_label": "切换配额保活",
+    "last_updated": "更新于 {{time}}"
   },
   "plugin_management": {
     "title": "插件管理",
@@ -1286,7 +1287,20 @@
     "smoke_test_timeout": "冒烟测试已超时（{{seconds}} 秒）",
     "smoke_test_empty_result": "请求成功，但未返回可显示的助手文本。",
     "smoke_test_status_code": "HTTP {{status}}",
-    "smoke_test_resolved_model": "实际模型：{{model}}"
+    "smoke_test_resolved_model": "实际模型：{{model}}",
+    "smoke_test_finish_reason": "结束原因",
+    "smoke_test_prompt_tokens": "输入",
+    "smoke_test_completion_tokens": "输出",
+    "smoke_test_total_tokens": "合计",
+    "smoke_test_cached_tokens": "缓存",
+    "smoke_test_reasoning_tokens": "推理",
+    "smoke_test_tab_response": "响应",
+    "smoke_test_tab_raw": "原始",
+    "smoke_test_tab_headers": "请求头",
+    "smoke_test_tab_curl": "cURL",
+    "smoke_test_no_headers": "无请求头。",
+    "smoke_test_history_title": "最近运行",
+    "smoke_test_history_clear": "清空"
   },
   "notification": {
     "request_log_updated": "请求日志设置已更新",
@@ -1608,6 +1622,7 @@
     "missing_auth_index": "认证文件缺少 auth_index",
     "empty_usage": "该凭证暂时还没有用量遥测数据。",
     "last_seen_never": "暂无遥测",
+    "fetcher_pending": "该凭证的用量遥测接口尚未接入，接口补齐后此卡片会自动显示数据。",
     "refresh_button": "刷新用量",
     "fetch_all": "获取全部",
     "health_label": "观测成功率",
@@ -1629,6 +1644,7 @@
     "missing_api_key": "Zen 配置缺少 API Key",
     "empty_usage": "该 Key 暂时还没有 Zen 用量遥测数据。",
     "last_seen_never": "暂无遥测",
+    "fetcher_pending": "该 Key 的用量遥测接口尚未接入，接口补齐后此卡片会自动显示数据。",
     "refresh_button": "刷新用量",
     "fetch_all": "获取全部",
     "health_label": "观测成功率",

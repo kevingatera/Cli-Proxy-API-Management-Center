@@ -35,10 +35,6 @@ export function isCursorFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'cursor';
 }
 
-export function isGeminiCliFile(file: AuthFileItem): boolean {
-  return resolveAuthProvider(file) === 'gemini-cli' || resolveAuthProvider(file) === 'gemini';
-}
-
 export function isZenFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'opencode-go' || resolveAuthProvider(file) === 'zen';
 }
