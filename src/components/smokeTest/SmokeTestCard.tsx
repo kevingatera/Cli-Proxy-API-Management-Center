@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -92,15 +92,17 @@ export function SmokeTestCard({ modelOptions, authApiBase, resolveApiKey }: Smok
   const [result, setResult] = useState<SmokeTestResultData | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('response');
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>('cliproxy-smoke-test-history', []);
-  const recentModelsRef = useRef<string[]>([]);
+  const recentModels = useMemo(
+    () => Array.from(new Set(history.map((entry) => entry.model))).slice(0, 8),
+    [history]
+  );
 
   // Recent-first model suggestions: models tested successfully bubble to top.
   const sortedModelOptions = useMemo(() => {
-    const recent = recentModelsRef.current;
-    const recentSet = new Set(recent);
+    const recentSet = new Set(recentModels);
     const rest = modelOptions.filter((m) => !recentSet.has(m));
-    return [...recent, ...rest];
-  }, [modelOptions]);
+    return [...recentModels, ...rest];
+  }, [modelOptions, recentModels]);
 
   // Auto-pick a sensible default model on first load.
   const defaultModel = useMemo(() => {
@@ -207,10 +209,7 @@ export function SmokeTestCard({ modelOptions, authApiBase, resolveApiKey }: Smok
               }
         );
 
-        // Track in recent models + history.
-        if (success) {
-          recentModelsRef.current = [useModel, ...recentModelsRef.current.filter((m) => m !== useModel)].slice(0, 8);
-        }
+        // Recent-models list is derived from `history` (above). No-op here.
 
         const entry: HistoryEntry = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

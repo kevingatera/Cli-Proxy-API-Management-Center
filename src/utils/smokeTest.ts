@@ -113,14 +113,14 @@ export const extractTokens = (body: unknown): SmokeTestTokens => {
   const usage = (body as Record<string, unknown>)?.usage;
   if (!usage || typeof usage !== 'object') return empty;
 
-  const u = usage as Record<string, any>;
+  const u = usage as Record<string, unknown>;
   const num = (v: unknown): number => {
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? n : 0;
   };
 
-  const promptDetails = u.prompt_tokens_details ?? {};
-  const completionDetails = u.completion_tokens_details ?? {};
+  const promptDetails = (u.prompt_tokens_details ?? {}) as Record<string, unknown>;
+  const completionDetails = (u.completion_tokens_details ?? {}) as Record<string, unknown>;
 
   return {
     prompt: num(u.prompt_tokens ?? u.input_tokens),

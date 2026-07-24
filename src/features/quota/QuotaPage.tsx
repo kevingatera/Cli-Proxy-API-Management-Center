@@ -18,6 +18,7 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import {
@@ -61,6 +62,8 @@ import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
+// 站点保活：开启时每 60 秒重拉文件列表与当前页额度，页面隐藏时暂停。
+const STATION_KEEPING_INTERVAL_MS = 60_000;
 
 /**
  * Existing providers display filenames; Devin's card and timeline share an
@@ -305,6 +308,16 @@ export function QuotaPage() {
       Boolean(error) ||
       filesGeneration !== sessionGeneration,
     loadQuota
+  );
+
+  // Station keeping runs the same path as the header refresh-all button, so the
+  // interval reloads quota telemetry rather than only the file list.
+  useInterval(
+    () => {
+      if (document.visibilityState !== 'visible' || loading || batchLoading) return;
+      handleRefreshAll();
+    },
+    stationKeepingEnabled ? STATION_KEEPING_INTERVAL_MS : null
   );
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
