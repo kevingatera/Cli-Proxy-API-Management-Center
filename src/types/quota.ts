@@ -341,3 +341,41 @@ export interface XaiQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+// Cursor and OpenCode Zen usage summary types
+export interface CursorModelUsageSummary {
+  model: string;
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  tokenTelemetryCount?: number;
+  lastSeenAt?: string;
+}
+
+export interface CursorUsageSummary {
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  modelCount: number;
+  tokenTelemetryCount?: number;
+  lastSeenAt?: string;
+  models?: CursorModelUsageSummary[];
+}
+
+export interface CursorQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  summary: CursorUsageSummary;
+  error?: string;
+  errorStatus?: number;
+}
+
+export type ZenUsageSummary = CursorUsageSummary;
+
+export interface ZenQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  summary: ZenUsageSummary;
+  error?: string;
+  errorStatus?: number;
+}

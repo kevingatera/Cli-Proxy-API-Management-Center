@@ -31,6 +31,18 @@ export function isXaiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'xai';
 }
 
+export function isCursorFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'cursor';
+}
+
+export function isGeminiCliFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'gemini-cli' || resolveAuthProvider(file) === 'gemini';
+}
+
+export function isZenFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'opencode-go' || resolveAuthProvider(file) === 'zen';
+}
+
 export function isDisabledAuthFile(file: AuthFileItem): boolean {
   const raw = (file as { disabled?: unknown }).disabled;
   if (typeof raw === 'boolean') return raw;
