@@ -8,6 +8,7 @@ export { useLanguageStore } from './useLanguageStore';
 export { useAuthStore } from './useAuthStore';
 export { useConfigStore } from './useConfigStore';
 export { useModelsStore } from './useModelsStore';
+export { useQuotaStationKeepingStore } from './useQuotaStationKeepingStore';
 export {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,

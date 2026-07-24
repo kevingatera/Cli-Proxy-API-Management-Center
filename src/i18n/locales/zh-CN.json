@@ -1067,7 +1067,10 @@
   "quota_management": {
     "title": "配额管理",
     "description": "集中查看 OAuth 额度与剩余情况",
-    "refresh_all_credentials": "刷新全部凭证"
+    "refresh_all_credentials": "刷新全部凭证",
+    "station_keeping_label": "配额保活",
+    "station_keeping_hint": "自动刷新配额状态以捕捉周期性重置。",
+    "station_keeping_toggle_label": "切换配额保活"
   },
   "plugin_management": {
     "title": "插件管理",

@@ -803,3 +803,16 @@
     line-height: 1.6;
   }
 }
+
+.stationKeepingRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+  margin-top: $spacing-sm;
+}
+
+.stationKeepingHint {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
