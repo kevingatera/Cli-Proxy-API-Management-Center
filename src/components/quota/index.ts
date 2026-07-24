@@ -9,7 +9,9 @@ export {
   ANTIGRAVITY_CONFIG,
   CLAUDE_CONFIG,
   CODEX_CONFIG,
+  CURSOR_CONFIG,
   KIMI_CONFIG,
   XAI_CONFIG,
+  ZEN_CONFIG,
 } from './quotaConfigs';
 export type { QuotaConfig } from './quotaConfigs';

@@ -1597,5 +1597,50 @@
     "modelCatalog": {
       "notLoaded": "Not loaded"
     }
+  },
+  "cursor_quota": {
+    "title": "Cursor Usage",
+    "empty_title": "No Cursor Auth Files",
+    "empty_desc": "Upload a Cursor credential to view usage telemetry.",
+    "idle": "Not loaded. Click Refresh Button.",
+    "loading": "Loading usage...",
+    "load_failed": "Failed to load usage: {{message}}",
+    "missing_auth_index": "Auth file missing auth_index",
+    "empty_usage": "No usage telemetry yet for this credential.",
+    "last_seen_never": "no telemetry yet",
+    "refresh_button": "Refresh Usage",
+    "fetch_all": "Fetch All",
+    "health_label": "Observed success rate",
+    "telemetry_label": "Local telemetry",
+    "requests_value": "{{count}} requests",
+    "failures_value": "{{count}} failures",
+    "tokens_value": "{{count}} tokens",
+    "tokens_unavailable": "tokens unavailable",
+    "models_value": "{{count}} models",
+    "telemetry_note": "Telemetry-based view for Cursor CLI credentials (account quota API is not exposed)."
+  },
+  "zen_quota": {
+    "title": "OpenCode Zen Usage",
+    "empty_title": "No OpenCode Zen Keys",
+    "empty_desc": "Add an OpenCode Zen or Go API key to view local usage telemetry.",
+    "idle": "Not loaded. Click Refresh Button.",
+    "loading": "Loading usage...",
+    "load_failed": "Failed to load usage: {{message}}",
+    "missing_api_key": "Zen entry missing API key",
+    "empty_usage": "No Zen usage telemetry yet for this key.",
+    "last_seen_never": "no telemetry yet",
+    "refresh_button": "Refresh Usage",
+    "fetch_all": "Fetch All",
+    "health_label": "Observed success rate",
+    "requests_value": "{{count}} requests",
+    "failures_value": "{{count}} failures",
+    "tokens_value": "{{count}} tokens",
+    "tokens_unavailable": "tokens unavailable",
+    "models_value": "{{count}} models",
+    "model_breakdown_title": "Model mix and estimated Go limits",
+    "model_usage_value": "{{requests}} requests, {{failures}} failures, {{tokens}} · {{limits}}",
+    "model_limits_value": "5h {{fiveHour}}, week {{weekly}}, month {{monthly}}",
+    "model_limits_unknown": "limits not listed",
+    "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage."
   }
 }

@@ -13,8 +13,10 @@ import {
   ANTIGRAVITY_CONFIG,
   CLAUDE_CONFIG,
   CODEX_CONFIG,
+  CURSOR_CONFIG,
   KIMI_CONFIG,
   XAI_CONFIG,
+  ZEN_CONFIG,
 } from '@/components/quota';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
@@ -96,7 +98,19 @@ export function QuotaPage() {
         disabled={disableControls}
       />
       <QuotaSection
+        config={CURSOR_CONFIG}
+        files={files}
+        loading={loading}
+        disabled={disableControls}
+      />
+      <QuotaSection
         config={KIMI_CONFIG}
+        files={files}
+        loading={loading}
+        disabled={disableControls}
+      />
+      <QuotaSection
+        config={ZEN_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}

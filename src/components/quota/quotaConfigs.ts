@@ -22,10 +22,15 @@ import type {
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
+  CursorModelUsageSummary as _CursorModelUsageSummary,
+  CursorQuotaState,
+  CursorUsageSummary,
   KimiQuotaRow,
   KimiQuotaState,
   XaiBillingSummary,
   XaiQuotaState,
+  ZenQuotaState,
+  ZenUsageSummary,
 } from '@/types';
 import {
   antigravitySubscriptionApi,
@@ -80,10 +85,12 @@ import {
   isAntigravityFile,
   isClaudeFile,
   isCodexFile,
+  isCursorFile,
   isDisabledAuthFile,
   isKimiFile,
   isPaidXaiAuthFile,
   isXaiFile,
+  isZenFile,
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import { formatDateTimeValue } from '@/utils/format';
@@ -92,7 +99,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'claude' | 'codex' | 'kimi' | 'xai';
+type QuotaType = 'antigravity' | 'claude' | 'codex' | 'cursor' | 'kimi' | 'opencode-go' | 'xai';
 
 type AntigravityQuotaData = {
   groups: AntigravityQuotaGroup[];
@@ -124,13 +131,17 @@ export interface QuotaStore {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
+  cursorQuota: Record<string, CursorQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
+  zenQuota: Record<string, ZenQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
+  setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
+  setZenQuota: (updater: QuotaUpdater<Record<string, ZenQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
 
@@ -1868,4 +1879,156 @@ export const XAI_CONFIG: QuotaConfig<XaiQuotaState, XaiBillingSummary> = {
   cardClassName: styles.xaiCard,
   gridClassName: styles.xaiGrid,
   renderQuotaItems: renderXaiItems,
+};
+
+// ----- Cursor and OpenCode Zen quota configs -----
+// The new upstream/main has Antigravity, Claude, Codex, Kimi, and xAI providers,
+// but not Cursor or OpenCode Zen. The homelab .108 deployment uses these, so
+// re-add the configs. The full fetcher and renderer code lives in a follow-up
+// commit; this commit wires the store + types so the UI doesn't error.
+
+const emptyCursorSummary = (): CursorUsageSummary => ({
+  requests: 0,
+  successCount: 0,
+  failureCount: 0,
+  totalTokens: 0,
+  modelCount: 0,
+  tokenTelemetryCount: 0,
+});
+
+// Cursor quota card. Fetching + usage telemetry aggregation is provided by
+// the proxy /usage endpoint; this card just renders the cached summary. The
+// fetcher is wired to the QuotaPage header refresh, so the same data path
+// used by the new upstream's antigravity/codex sections applies.
+const fetchCursorQuota = async (_file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
+  // Placeholder: real fetcher reads the proxy /usage endpoint and aggregates
+  // by authIndex. Until that is ported, return an empty summary so the card
+  // renders its "no telemetry yet" state instead of erroring.
+  void t;
+  return emptyCursorSummary();
+};
+
+const renderCursorItems = (
+  quota: CursorQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
+  const summary = quota.summary ?? emptyCursorSummary();
+  const hasTelemetry = summary.requests > 0;
+  const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
+  const lastSeenLabel = summary.lastSeenAt
+    ? t('quota_management.last_updated', { time: summary.lastSeenAt })
+    : t('cursor_quota.last_seen_never');
+  return h(
+    Fragment,
+    null,
+    h(
+      'div',
+      { className: styleMap.quotaRow },
+      h(
+        'div',
+        { className: styleMap.quotaRowHeader },
+        h('span', { className: styleMap.quotaModel }, t('cursor_quota.health_label')),
+        h(
+          'div',
+          { className: styleMap.quotaMeta },
+          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h('span', { className: styleMap.quotaReset }, lastSeenLabel)
+        )
+      ),
+      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
+      hasTelemetry ? t('cursor_quota.telemetry_note') : t('cursor_quota.empty_usage')
+    )
+  );
+};
+
+const fetchZenQuota = async (_file: AuthFileItem, t: TFunction): Promise<ZenUsageSummary> => {
+  void t;
+  return emptyCursorSummary();
+};
+
+const renderZenItems = (
+  quota: ZenQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
+  const summary = quota.summary ?? emptyCursorSummary();
+  const hasTelemetry = summary.requests > 0;
+  const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
+  const lastSeenLabel = summary.lastSeenAt
+    ? t('quota_management.last_updated', { time: summary.lastSeenAt })
+    : t('zen_quota.last_seen_never');
+  return h(
+    Fragment,
+    null,
+    h(
+      'div',
+      { className: styleMap.quotaRow },
+      h(
+        'div',
+        { className: styleMap.quotaRowHeader },
+        h('span', { className: styleMap.quotaModel }, t('zen_quota.health_label')),
+        h(
+          'div',
+          { className: styleMap.quotaMeta },
+          h('span', { className: styleMap.quotaPercent }, `${successPct}%`),
+          h('span', { className: styleMap.quotaReset }, lastSeenLabel)
+        )
+      ),
+      h(QuotaProgressBar, { percent: successPct, highThreshold: 80, mediumThreshold: 50 })
+    ),
+    h(
+      'div',
+      { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
+      hasTelemetry ? t('zen_quota.telemetry_note') : t('zen_quota.empty_usage')
+    )
+  );
+};
+
+export const CURSOR_CONFIG: QuotaConfig<CursorQuotaState, CursorUsageSummary> = {
+  type: 'cursor',
+  i18nPrefix: 'cursor_quota',
+  filterFn: (file) => isCursorFile(file) && !isDisabledAuthFile(file),
+  fetchQuota: fetchCursorQuota,
+  storeSelector: (state) => state.cursorQuota,
+  storeSetter: 'setCursorQuota',
+  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildSuccessState: (summary) => ({ status: 'success', summary }),
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    summary: emptyCursorSummary(),
+    error: message,
+    errorStatus: status,
+  }),
+  cardClassName: styles.codexCard,
+  gridClassName: styles.codexGrid,
+  renderQuotaItems: renderCursorItems,
+};
+
+export const ZEN_CONFIG: QuotaConfig<ZenQuotaState, ZenUsageSummary> = {
+  type: 'opencode-go',
+  i18nPrefix: 'zen_quota',
+  filterFn: (file) => isZenFile(file),
+  fetchQuota: fetchZenQuota,
+  storeSelector: (state) => state.zenQuota,
+  storeSetter: 'setZenQuota',
+  buildLoadingState: () => ({ status: 'loading', summary: emptyCursorSummary() }),
+  buildSuccessState: (summary) => ({ status: 'success', summary }),
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    summary: emptyCursorSummary(),
+    error: message,
+    errorStatus: status,
+  }),
+  cardClassName: styles.codexCard,
+  gridClassName: styles.codexGrid,
+  renderQuotaItems: renderZenItems,
 };
