@@ -22,7 +22,7 @@ import type {
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
-  CursorModelUsageSummary as _CursorModelUsageSummary,
+  CursorModelUsageSummary,
   CursorQuotaState,
   CursorUsageSummary,
   KimiQuotaRow,
@@ -1894,6 +1894,7 @@ const emptyCursorSummary = (): CursorUsageSummary => ({
   totalTokens: 0,
   modelCount: 0,
   tokenTelemetryCount: 0,
+  models: [] as CursorModelUsageSummary[],
 });
 
 // Cursor quota card. Fetching + usage telemetry aggregation is provided by

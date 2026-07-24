@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
@@ -94,13 +95,17 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   files: AuthFileItem[];
   loading: boolean;
   disabled: boolean;
+  stationKeepingEnabled?: boolean;
 }
+
+const STATION_KEEPING_INTERVAL_MS = 60_000;
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
   config,
   files,
   loading,
   disabled,
+  stationKeepingEnabled = true,
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -170,6 +175,19 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     pendingQuotaRefreshRef.current = true;
     void triggerHeaderRefresh();
   }, []);
+
+  // Station keeping: when enabled, periodically trigger a quota refresh so
+  // weekly resets are caught without operator action. Disabled skips the
+  // interval entirely.
+  useInterval(
+    () => {
+      if (stationKeepingEnabled) {
+        pendingQuotaRefreshRef.current = true;
+        void triggerHeaderRefresh();
+      }
+    },
+    stationKeepingEnabled ? STATION_KEEPING_INTERVAL_MS : null
+  );
 
   useEffect(() => {
     const wasLoading = prevFilesLoadingRef.current;

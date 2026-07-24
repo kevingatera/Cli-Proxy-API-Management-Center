@@ -78,42 +78,49 @@ export function QuotaPage() {
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={ANTIGRAVITY_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={CODEX_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={XAI_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={CURSOR_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={KIMI_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
       <QuotaSection
         config={ZEN_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
       />
     </div>
   );
