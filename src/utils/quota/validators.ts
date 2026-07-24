@@ -37,6 +37,18 @@ export function isXaiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'xai';
 }
 
+export function isCursorFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'cursor';
+}
+
+export function isGeminiCliFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'gemini-cli' || resolveAuthProvider(file) === 'gemini';
+}
+
+export function isZenFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'opencode-go' || resolveAuthProvider(file) === 'zen';
+}
+
 /** Providers rendered by a dedicated built-in quota card. */
 export const BUILT_IN_QUOTA_PROVIDERS: ReadonlySet<string> = new Set([
   'antigravity',
