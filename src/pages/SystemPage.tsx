@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
+import { SmokeTestCard } from '@/components/smokeTest/SmokeTestCard';
 import {
   useAuthStore,
   useConfigStore,
@@ -103,6 +104,10 @@ export function SystemPage() {
     [i18n.language]
   );
   const groupedModels = useMemo(() => classifyModels(models, { otherLabel }), [models, otherLabel]);
+  const modelOptions = useMemo(
+    () => Array.from(new Set(models.map((model) => model.name).filter(Boolean))).sort(),
+    [models]
+  );
   const requestLogEnabled = config?.requestLog ?? false;
   const requestLogDirty = requestLogDraft !== requestLogEnabled;
   const canEditRequestLog = auth.connectionStatus === 'connected' && Boolean(config);
@@ -120,6 +125,11 @@ export function SystemPage() {
   };
 
   const resolveApiKeysForModels = useApiKeysForModels();
+
+  const resolvePrimaryKey = useCallback(async (): Promise<string | undefined> => {
+    const keys = await resolveApiKeysForModels();
+    return keys[0];
+  }, [resolveApiKeysForModels]);
 
   const fetchModels = async ({ forceRefresh = false }: { forceRefresh?: boolean } = {}) => {
     if (auth.connectionStatus !== 'connected') {
@@ -465,6 +475,12 @@ export function SystemPage() {
             </Button>
           </div>
         </Card>
+
+        <SmokeTestCard
+          modelOptions={modelOptions}
+          authApiBase={auth.apiBase}
+          resolveApiKey={resolvePrimaryKey}
+        />
       </div>
 
       <Modal
