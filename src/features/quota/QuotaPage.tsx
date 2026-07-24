@@ -16,10 +16,16 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { IconSearch, IconX } from '@/components/ui/icons';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
-import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
+import {
+  useAuthStore,
+  useQuotaStationKeepingStore,
+  useQuotaStore,
+  useThemeStore,
+} from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
@@ -65,6 +71,8 @@ const displayNameFor = (name: string) => name;
 export function QuotaPage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const stationKeepingEnabled = useQuotaStationKeepingStore((state) => state.enabled);
+  const setStationKeepingEnabled = useQuotaStationKeepingStore((state) => state.setEnabled);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
@@ -333,6 +341,18 @@ export function QuotaPage() {
         disableControls={disableControls}
         onRefreshAll={handleRefreshAll}
       />
+
+      <div className={styles.stationKeepingRow}>
+        <ToggleSwitch
+          checked={stationKeepingEnabled}
+          onChange={setStationKeepingEnabled}
+          ariaLabel={t('quota_management.station_keeping_toggle_label')}
+          label={t('quota_management.station_keeping_label')}
+        />
+        <span className={styles.stationKeepingHint}>
+          {t('quota_management.station_keeping_hint')}
+        </span>
+      </div>
 
       <section className={styles.workbench}>
         {/* 提供商导航与搜索工具栏分层，避免不同控件争夺视觉焦点。 */}

@@ -218,3 +218,15 @@
     gap: 16px;
   }
 }
+
+.stationKeepingRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.stationKeepingHint {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
