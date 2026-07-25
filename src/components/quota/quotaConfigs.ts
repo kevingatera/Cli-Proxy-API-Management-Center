@@ -37,8 +37,10 @@ import {
   apiCallApi,
   authFilesApi,
   getApiCallErrorMessage,
+  usageApi,
   type AntigravitySubscriptionSummary,
 } from '@/services/api';
+import { buildCandidateUsageSourceIds, normalizeUsageSourceId } from '@/utils/usage';
 import {
   ANTIGRAVITY_QUOTA_URLS,
   ANTIGRAVITY_REQUEST_HEADERS,
@@ -1884,8 +1886,9 @@ export const XAI_CONFIG: QuotaConfig<XaiQuotaState, XaiBillingSummary> = {
 // ----- Cursor and OpenCode Zen quota configs -----
 // The new upstream/main has Antigravity, Claude, Codex, Kimi, and xAI providers,
 // but not Cursor or OpenCode Zen. The homelab .108 deployment uses these, so
-// re-add the configs. The full fetcher and renderer code lives in a follow-up
-// commit; this commit wires the store + types so the UI doesn't error.
+// re-add the configs. The fetchers read the proxy /usage endpoint and aggregate
+// request telemetry per auth file; when the endpoint is missing (older/newer
+// backends without /usage) the cards degrade to the fetcher_pending hint.
 
 const emptyUsageSummary = (): CursorUsageSummary => ({
   requests: 0,
@@ -1897,16 +1900,342 @@ const emptyUsageSummary = (): CursorUsageSummary => ({
   models: [] as CursorModelUsageSummary[],
 });
 
-// Cursor quota card. Fetching + usage telemetry aggregation is provided by
-// the proxy /usage endpoint; this card just renders the cached summary. The
-// fetcher is wired to the QuotaPage header refresh, so the same data path
-// used by the new upstream's antigravity/codex sections applies.
-const fetchCursorQuota = async (_file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
-  // Placeholder: real fetcher reads the proxy /usage endpoint and aggregates
-  // by authIndex. Until that is ported, return an empty summary so the card
-  // renders its "no telemetry yet" state instead of erroring.
-  void t;
-  return emptyUsageSummary();
+interface CursorUsageAccumulator {
+  requests: number;
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  tokenTelemetryCount: number;
+  modelNames: Set<string>;
+  models: Map<string, CursorUsageAccumulator>;
+  lastSeenMillis: number | null;
+}
+
+interface CursorUsageIndex {
+  byAuthIndex: Map<string, CursorUsageSummary>;
+  byAuthId: Map<string, CursorUsageSummary>;
+  bySource: Map<string, CursorUsageSummary>;
+}
+
+const CURSOR_USAGE_CACHE_TTL_MS = 1500;
+let cursorUsageIndexCache: { fetchedAt: number; index: CursorUsageIndex } | null = null;
+let cursorUsageIndexInFlight: Promise<CursorUsageIndex> | null = null;
+// Set when the /usage endpoint cannot be fetched (404, network error, ...).
+// Renderers use it to show the fetcher_pending hint instead of empty_usage.
+let cursorUsageEndpointUnavailable = false;
+
+const createCursorUsageAccumulator = (): CursorUsageAccumulator => ({
+  requests: 0,
+  successCount: 0,
+  failureCount: 0,
+  totalTokens: 0,
+  tokenTelemetryCount: 0,
+  modelNames: new Set<string>(),
+  models: new Map<string, CursorUsageAccumulator>(),
+  lastSeenMillis: null,
+});
+
+const cloneCursorSummary = (summary: CursorUsageSummary): CursorUsageSummary => ({
+  ...summary,
+  models: summary.models?.map((model) => ({ ...model })),
+});
+
+const mergeModelUsageSummaries = (
+  base: CursorModelUsageSummary[] | undefined,
+  patch: CursorModelUsageSummary[] | undefined
+): CursorModelUsageSummary[] | undefined => {
+  if (!base?.length && !patch?.length) return undefined;
+  const byModel = new Map<string, CursorModelUsageSummary>();
+
+  const upsert = (item: CursorModelUsageSummary) => {
+    const current = byModel.get(item.model);
+    if (!current) {
+      byModel.set(item.model, { ...item });
+      return;
+    }
+    current.requests += item.requests;
+    current.successCount += item.successCount;
+    current.failureCount += item.failureCount;
+    current.totalTokens += item.totalTokens;
+    current.tokenTelemetryCount =
+      (current.tokenTelemetryCount ?? 0) + (item.tokenTelemetryCount ?? 0);
+    current.lastSeenAt =
+      current.lastSeenAt && item.lastSeenAt
+        ? Date.parse(current.lastSeenAt) >= Date.parse(item.lastSeenAt)
+          ? current.lastSeenAt
+          : item.lastSeenAt
+        : (current.lastSeenAt ?? item.lastSeenAt);
+  };
+
+  base?.forEach(upsert);
+  patch?.forEach(upsert);
+  return Array.from(byModel.values()).sort((a, b) => {
+    if (b.requests !== a.requests) return b.requests - a.requests;
+    return a.model.localeCompare(b.model);
+  });
+};
+
+const mergeCursorSummary = (
+  base: CursorUsageSummary,
+  patch: CursorUsageSummary | undefined
+): CursorUsageSummary => {
+  if (!patch) return base;
+  return {
+    requests: base.requests + patch.requests,
+    successCount: base.successCount + patch.successCount,
+    failureCount: base.failureCount + patch.failureCount,
+    totalTokens: base.totalTokens + patch.totalTokens,
+    modelCount: Math.max(base.modelCount, patch.modelCount),
+    tokenTelemetryCount: (base.tokenTelemetryCount ?? 0) + (patch.tokenTelemetryCount ?? 0),
+    models: mergeModelUsageSummaries(base.models, patch.models),
+    lastSeenAt:
+      base.lastSeenAt && patch.lastSeenAt
+        ? Date.parse(base.lastSeenAt) >= Date.parse(patch.lastSeenAt)
+          ? base.lastSeenAt
+          : patch.lastSeenAt
+        : (base.lastSeenAt ?? patch.lastSeenAt),
+  };
+};
+
+const parseTokenMetrics = (tokens: unknown): { total: number; reported: boolean } => {
+  if (!tokens || typeof tokens !== 'object') return { total: 0, reported: false };
+  const record = tokens as Record<string, unknown>;
+  const totalNode = normalizeNumberValue(record.total_tokens ?? record.totalTokens);
+
+  const input = normalizeNumberValue(record.input_tokens ?? record.inputTokens);
+  const output = normalizeNumberValue(record.output_tokens ?? record.outputTokens);
+  const reasoning = normalizeNumberValue(record.reasoning_tokens ?? record.reasoningTokens);
+  const cached = normalizeNumberValue(record.cached_tokens ?? record.cachedTokens);
+
+  if (totalNode !== null) {
+    const isAllZero =
+      totalNode === 0 &&
+      (input ?? 0) === 0 &&
+      (output ?? 0) === 0 &&
+      (reasoning ?? 0) === 0 &&
+      (cached ?? 0) === 0;
+    return { total: Math.max(0, Math.round(totalNode)), reported: !isAllZero };
+  }
+
+  const reported = input !== null || output !== null || reasoning !== null;
+  if (!reported) {
+    return { total: 0, reported: false };
+  }
+
+  const total = (input ?? 0) + (output ?? 0) + (reasoning ?? 0);
+  return { total: Math.max(0, Math.round(total)), reported: true };
+};
+
+const parseTimestamp = (value: unknown): number | null => {
+  const ts = normalizeStringValue(value);
+  if (!ts) return null;
+  const millis = Date.parse(ts);
+  return Number.isFinite(millis) ? millis : null;
+};
+
+const upsertCursorUsageAccumulator = (
+  map: Map<string, CursorUsageAccumulator>,
+  key: string,
+  model: string,
+  detail: Record<string, unknown>
+) => {
+  const normalizedKey = normalizeStringValue(key);
+  if (!normalizedKey) return;
+
+  const current = map.get(normalizedKey) ?? createCursorUsageAccumulator();
+  current.requests += 1;
+  const failed = Boolean(detail.failed);
+  if (failed) current.failureCount += 1;
+  else current.successCount += 1;
+
+  if (model) current.modelNames.add(model);
+  const tokenMetrics = parseTokenMetrics(detail.tokens);
+  current.totalTokens += tokenMetrics.total;
+  if (tokenMetrics.reported) {
+    current.tokenTelemetryCount += 1;
+  }
+
+  if (model) {
+    const modelAcc = current.models.get(model) ?? createCursorUsageAccumulator();
+    modelAcc.requests += 1;
+    if (failed) modelAcc.failureCount += 1;
+    else modelAcc.successCount += 1;
+    modelAcc.modelNames.add(model);
+    modelAcc.totalTokens += tokenMetrics.total;
+    if (tokenMetrics.reported) {
+      modelAcc.tokenTelemetryCount += 1;
+    }
+    const modelMillis = parseTimestamp(detail.timestamp);
+    if (
+      modelMillis !== null &&
+      (modelAcc.lastSeenMillis === null || modelMillis > modelAcc.lastSeenMillis)
+    ) {
+      modelAcc.lastSeenMillis = modelMillis;
+    }
+    current.models.set(model, modelAcc);
+  }
+
+  const millis = parseTimestamp(detail.timestamp);
+  if (millis !== null && (current.lastSeenMillis === null || millis > current.lastSeenMillis)) {
+    current.lastSeenMillis = millis;
+  }
+  map.set(normalizedKey, current);
+};
+
+const finalizeCursorUsageMap = (
+  map: Map<string, CursorUsageAccumulator>
+): Map<string, CursorUsageSummary> => {
+  const out = new Map<string, CursorUsageSummary>();
+  map.forEach((acc, key) => {
+    const models = Array.from(acc.models.entries())
+      .map(([model, modelAcc]) => ({
+        model,
+        requests: modelAcc.requests,
+        successCount: modelAcc.successCount,
+        failureCount: modelAcc.failureCount,
+        totalTokens: modelAcc.totalTokens,
+        tokenTelemetryCount: modelAcc.tokenTelemetryCount,
+        lastSeenAt:
+          modelAcc.lastSeenMillis !== null
+            ? new Date(modelAcc.lastSeenMillis).toISOString()
+            : undefined,
+      }))
+      .sort((a, b) => {
+        if (b.requests !== a.requests) return b.requests - a.requests;
+        return a.model.localeCompare(b.model);
+      });
+    out.set(key, {
+      requests: acc.requests,
+      successCount: acc.successCount,
+      failureCount: acc.failureCount,
+      totalTokens: acc.totalTokens,
+      modelCount: acc.modelNames.size,
+      tokenTelemetryCount: acc.tokenTelemetryCount,
+      models,
+      lastSeenAt:
+        acc.lastSeenMillis !== null ? new Date(acc.lastSeenMillis).toISOString() : undefined,
+    });
+  });
+  return out;
+};
+
+const buildCursorUsageIndex = (usageRoot: Record<string, unknown>): CursorUsageIndex => {
+  const apis =
+    usageRoot && typeof usageRoot.apis === 'object' && usageRoot.apis !== null
+      ? (usageRoot.apis as Record<string, unknown>)
+      : {};
+
+  const byAuthIndexAcc = new Map<string, CursorUsageAccumulator>();
+  const byAuthIdAcc = new Map<string, CursorUsageAccumulator>();
+  const bySourceAcc = new Map<string, CursorUsageAccumulator>();
+
+  for (const apiValue of Object.values(apis)) {
+    if (!apiValue || typeof apiValue !== 'object') continue;
+    const modelsRecord = (apiValue as Record<string, unknown>).models;
+    if (!modelsRecord || typeof modelsRecord !== 'object') continue;
+
+    for (const [modelKey, modelValue] of Object.entries(modelsRecord as Record<string, unknown>)) {
+      if (!modelValue || typeof modelValue !== 'object') continue;
+      const details = (modelValue as Record<string, unknown>).details;
+      if (!Array.isArray(details)) continue;
+
+      for (const detailValue of details) {
+        if (!detailValue || typeof detailValue !== 'object') continue;
+        const detail = detailValue as Record<string, unknown>;
+        const detailAuthIndex = normalizeAuthIndex(detail.auth_index ?? detail.authIndex);
+        const detailAuthId = normalizeStringValue(detail.auth_id ?? detail.authId);
+        const detailSource = normalizeUsageSourceId(detail.source);
+
+        if (detailAuthIndex) {
+          upsertCursorUsageAccumulator(byAuthIndexAcc, detailAuthIndex, modelKey, detail);
+        }
+        if (detailAuthId) {
+          upsertCursorUsageAccumulator(byAuthIdAcc, detailAuthId, modelKey, detail);
+        }
+        if (detailSource) {
+          upsertCursorUsageAccumulator(bySourceAcc, detailSource, modelKey, detail);
+        }
+      }
+    }
+  }
+
+  return {
+    byAuthIndex: finalizeCursorUsageMap(byAuthIndexAcc),
+    byAuthId: finalizeCursorUsageMap(byAuthIdAcc),
+    bySource: finalizeCursorUsageMap(bySourceAcc),
+  };
+};
+
+const emptyCursorUsageIndex = (): CursorUsageIndex => ({
+  byAuthIndex: new Map<string, CursorUsageSummary>(),
+  byAuthId: new Map<string, CursorUsageSummary>(),
+  bySource: new Map<string, CursorUsageSummary>(),
+});
+
+const loadCursorUsageIndex = async (): Promise<CursorUsageIndex> => {
+  const now = Date.now();
+  if (cursorUsageIndexCache && now - cursorUsageIndexCache.fetchedAt < CURSOR_USAGE_CACHE_TTL_MS) {
+    return cursorUsageIndexCache.index;
+  }
+  if (cursorUsageIndexInFlight) {
+    return cursorUsageIndexInFlight;
+  }
+
+  cursorUsageIndexInFlight = (async () => {
+    try {
+      const response = (await usageApi.getUsage()) as Record<string, unknown> | null | undefined;
+      const usageRoot = (response?.usage ?? response) as Record<string, unknown>;
+      const index = buildCursorUsageIndex(usageRoot);
+      cursorUsageEndpointUnavailable = false;
+      cursorUsageIndexCache = { fetchedAt: Date.now(), index };
+      return index;
+    } catch {
+      // The backend may not expose /usage (404) or may be unreachable. Degrade
+      // to an empty index so cards render the fetcher_pending hint instead of
+      // an error state.
+      cursorUsageEndpointUnavailable = true;
+      const index = emptyCursorUsageIndex();
+      cursorUsageIndexCache = { fetchedAt: Date.now(), index };
+      return index;
+    }
+  })();
+
+  try {
+    return await cursorUsageIndexInFlight;
+  } finally {
+    cursorUsageIndexInFlight = null;
+  }
+};
+
+// Cursor quota card. Reads the proxy /usage endpoint and aggregates telemetry
+// by auth_index (falling back to auth file id/name matching).
+const fetchCursorQuota = async (file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
+  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
+  const authIndex = normalizeAuthIndex(rawAuthIndex);
+  const authIds = [normalizeStringValue(file.id), normalizeStringValue(file.name)].filter(
+    (value): value is string => Boolean(value)
+  );
+  if (!authIndex && authIds.length === 0) {
+    throw new Error(t('cursor_quota.missing_auth_index'));
+  }
+
+  const usageIndex = await loadCursorUsageIndex();
+  let summary = emptyUsageSummary();
+
+  if (authIndex) {
+    summary = mergeCursorSummary(summary, usageIndex.byAuthIndex.get(authIndex));
+  }
+
+  if (summary.requests === 0 && authIds.length > 0) {
+    for (const authId of authIds) {
+      const byAuthIdSummary = usageIndex.byAuthId.get(authId);
+      if (!byAuthIdSummary) continue;
+      summary = mergeCursorSummary(summary, byAuthIdSummary);
+      if (summary.requests > 0) break;
+    }
+  }
+
+  return cloneCursorSummary(summary);
 };
 
 const renderCursorItems = (
@@ -1918,10 +2247,15 @@ const renderCursorItems = (
   const { createElement: h, Fragment } = React;
   const summary = quota.summary ?? emptyUsageSummary();
   const hasTelemetry = summary.requests > 0;
+  const hasTokenTelemetry = (summary.tokenTelemetryCount ?? 0) > 0;
   const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
   const lastSeenLabel = summary.lastSeenAt
-    ? t('quota_management.last_updated', { time: summary.lastSeenAt })
+    ? formatQuotaResetTime(summary.lastSeenAt)
     : t('cursor_quota.last_seen_never');
+  const emptyHint = cursorUsageEndpointUnavailable
+    ? t('cursor_quota.fetcher_pending')
+    : t('cursor_quota.empty_usage');
+
   return h(
     Fragment,
     null,
@@ -1948,19 +2282,97 @@ const renderCursorItems = (
         { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
       )
     ),
+    hasTelemetry &&
+      h(
+        'div',
+        { className: styleMap.quotaMeta, style: { marginTop: '0.5rem' } },
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('cursor_quota.requests_value', { count: summary.requests })
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('cursor_quota.failures_value', { count: summary.failureCount })
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          hasTokenTelemetry
+            ? t('cursor_quota.tokens_value', { count: summary.totalTokens })
+            : t('cursor_quota.tokens_unavailable')
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('cursor_quota.models_value', { count: summary.modelCount })
+        )
+      ),
     h(
       'div',
       { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
-      hasTelemetry
-        ? t('cursor_quota.telemetry_note')
-        : t('cursor_quota.fetcher_pending')
+      hasTelemetry ? t('cursor_quota.telemetry_note') : emptyHint
     )
   );
 };
 
-const fetchZenQuota = async (_file: AuthFileItem, t: TFunction): Promise<ZenUsageSummary> => {
-  void t;
-  return emptyUsageSummary();
+const fetchZenQuota = async (file: AuthFileItem, t: TFunction): Promise<ZenUsageSummary> => {
+  const apiKey = normalizeStringValue(file.apiKey ?? file.api_key);
+  const prefix = normalizeStringValue(file.prefix);
+  const sourceIds = new Set<string>();
+
+  buildCandidateUsageSourceIds({
+    apiKey: apiKey ?? undefined,
+    prefix: prefix ?? undefined,
+  }).forEach((id) => sourceIds.add(id));
+  if (apiKey) {
+    sourceIds.add(normalizeUsageSourceId(apiKey));
+  }
+  if (prefix) {
+    sourceIds.add(normalizeUsageSourceId(prefix));
+  }
+
+  if (sourceIds.size === 0) {
+    throw new Error(t('zen_quota.missing_api_key'));
+  }
+
+  const usageIndex = await loadCursorUsageIndex();
+  let summary = emptyUsageSummary();
+  sourceIds.forEach((sourceId) => {
+    summary = mergeCursorSummary(summary, usageIndex.bySource.get(sourceId));
+  });
+
+  return cloneCursorSummary(summary);
+};
+
+const ZEN_GO_MODEL_LIMITS: Record<
+  string,
+  { label: string; fiveHour: number; weekly: number; monthly: number }
+> = {
+  'glm-5.1': { label: 'GLM-5.1', fiveHour: 880, weekly: 2150, monthly: 4300 },
+  'glm-5': { label: 'GLM-5', fiveHour: 1150, weekly: 2880, monthly: 5750 },
+  'kimi-k2.5': { label: 'Kimi K2.5', fiveHour: 1850, weekly: 4630, monthly: 9250 },
+  'kimi-k2.6': { label: 'Kimi K2.6', fiveHour: 1150, weekly: 2880, monthly: 5750 },
+  'mimo-v2-pro': { label: 'MiMo-V2-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
+  'mimo-v2-omni': { label: 'MiMo-V2-Omni', fiveHour: 2150, weekly: 5450, monthly: 10900 },
+  'mimo-v2.5-pro': { label: 'MiMo-V2.5-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
+  'mimo-v2.5': { label: 'MiMo-V2.5', fiveHour: 2150, weekly: 5450, monthly: 10900 },
+  'minimax-m2.7': { label: 'MiniMax M2.7', fiveHour: 3400, weekly: 8500, monthly: 17000 },
+  'minimax-m2.5': { label: 'MiniMax M2.5', fiveHour: 6300, weekly: 15900, monthly: 31800 },
+  'qwen3.6-plus': { label: 'Qwen3.6 Plus', fiveHour: 3300, weekly: 8200, monthly: 16300 },
+  'qwen3.5-plus': { label: 'Qwen3.5 Plus', fiveHour: 10200, weekly: 25200, monthly: 50500 },
+  'deepseek-v4-pro': { label: 'DeepSeek V4 Pro', fiveHour: 1300, weekly: 3250, monthly: 6500 },
+  'deepseek-v4-flash': { label: 'DeepSeek V4 Flash', fiveHour: 7450, weekly: 18600, monthly: 37300 },
+};
+
+const normalizeZenGoModelId = (model: string): string => {
+  const lower = model.trim().toLowerCase();
+  const withoutPrefix = lower.startsWith('opencode-go/')
+    ? lower.slice('opencode-go/'.length)
+    : lower;
+  const parts = withoutPrefix.split('/');
+  return parts[parts.length - 1];
 };
 
 const renderZenItems = (
@@ -1972,10 +2384,16 @@ const renderZenItems = (
   const { createElement: h, Fragment } = React;
   const summary = quota.summary ?? emptyUsageSummary();
   const hasTelemetry = summary.requests > 0;
+  const hasTokenTelemetry = (summary.tokenTelemetryCount ?? 0) > 0;
   const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
   const lastSeenLabel = summary.lastSeenAt
-    ? t('quota_management.last_updated', { time: summary.lastSeenAt })
+    ? formatQuotaResetTime(summary.lastSeenAt)
     : t('zen_quota.last_seen_never');
+  const emptyHint = cursorUsageEndpointUnavailable
+    ? t('zen_quota.fetcher_pending')
+    : t('zen_quota.empty_usage');
+  const modelBreakdown = (summary.models ?? []).slice(0, 6);
+
   return h(
     Fragment,
     null,
@@ -2002,13 +2420,88 @@ const renderZenItems = (
         { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
       )
     ),
+    hasTelemetry &&
+      h(
+        'div',
+        { className: styleMap.quotaMeta, style: { marginTop: '0.5rem' } },
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('zen_quota.requests_value', { count: summary.requests })
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('zen_quota.failures_value', { count: summary.failureCount })
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          hasTokenTelemetry
+            ? t('zen_quota.tokens_value', { count: summary.totalTokens })
+            : t('zen_quota.tokens_unavailable')
+        ),
+        h(
+          'span',
+          { className: styleMap.quotaAmount },
+          t('zen_quota.models_value', { count: summary.modelCount })
+        )
+      ),
     h(
       'div',
       { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
-      hasTelemetry
-        ? t('zen_quota.telemetry_note')
-        : t('zen_quota.fetcher_pending')
-    )
+      hasTelemetry ? t('zen_quota.telemetry_note') : emptyHint
+    ),
+    modelBreakdown.length > 0 &&
+      h(
+        'div',
+        { className: styleMap.quotaMessage, style: { marginTop: '0.75rem' } },
+        h(
+          'div',
+          { style: { fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' } },
+          t('zen_quota.model_breakdown_title')
+        ),
+        ...modelBreakdown.map((model) => {
+          const modelId = normalizeZenGoModelId(model.model);
+          const limits = ZEN_GO_MODEL_LIMITS[modelId];
+          const label = limits?.label ?? model.model;
+          const tokenText =
+            (model.tokenTelemetryCount ?? 0) > 0
+              ? t('zen_quota.tokens_value', { count: model.totalTokens })
+              : t('zen_quota.tokens_unavailable');
+          const limitText = limits
+            ? t('zen_quota.model_limits_value', {
+                fiveHour: limits.fiveHour.toLocaleString(),
+                weekly: limits.weekly.toLocaleString(),
+                monthly: limits.monthly.toLocaleString(),
+              })
+            : t('zen_quota.model_limits_unknown');
+          return h(
+            'div',
+            {
+              key: model.model,
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                padding: '0.3rem 0',
+                borderTop: '1px solid var(--border-color)',
+              },
+            },
+            h('span', { style: { color: 'var(--text-primary)', fontWeight: 500 } }, label),
+            h(
+              'span',
+              { style: { textAlign: 'right' } },
+              t('zen_quota.model_usage_value', {
+                requests: model.requests,
+                failures: model.failureCount,
+                tokens: tokenText,
+                limits: limitText,
+              })
+            )
+          );
+        })
+      )
   );
 };
 
