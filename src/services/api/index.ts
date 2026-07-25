@@ -14,4 +14,5 @@ export * from './models';
 export * from './metaQuota';
 export * from './plugins';
 export * from './transformers';
+export * from './usage';
 export * from './vertex';

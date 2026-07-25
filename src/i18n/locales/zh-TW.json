@@ -2397,7 +2397,8 @@
     "tokens_value": "{{count}} Tokens",
     "tokens_unavailable": "暫無 Tokens 遙測",
     "models_value": "{{count}} 個模型",
-    "telemetry_note": "當前為 Cursor CLI 憑證的本地遙測視圖（官方未開放帳戶額度 API）。"
+    "telemetry_note": "當前為 Cursor CLI 憑證的本地遙測視圖（官方未開放帳戶額度 API）。",
+    "fetcher_pending": "目前後端未提供用量遥測介面（/usage 無回應）。"
   },
   "zen_quota": {
     "title": "OpenCode Zen 用量",
@@ -2421,6 +2422,7 @@
     "model_usage_value": "{{requests}} 次請求，{{failures}} 次失敗，{{tokens}} · {{limits}}",
     "model_limits_value": "5 小時 {{fiveHour}}，每週 {{weekly}}，每月 {{monthly}}",
     "model_limits_unknown": "暫無限額參考",
-    "telemetry_note": "當前為 OpenCode Zen/Go Key 的本地遙測視圖。Zen 未開放帳戶額度 API，因此這裡使用代理觀測到的請求、失敗、模型和 Token 用量。"
+    "telemetry_note": "當前為 OpenCode Zen/Go Key 的本地遙測視圖。Zen 未開放帳戶額度 API，因此這裡使用代理觀測到的請求、失敗、模型和 Token 用量。",
+    "fetcher_pending": "目前後端未提供用量遥測介面（/usage 無回應）。"
   }
 }
