@@ -58,7 +58,7 @@ export function PluginQuotaSection({
   const [configuredFiles, setConfiguredFiles] = useState<AuthFileItem[]>([]);
   const [states, setStates] = useState<Record<string, State>>({});
   const [error, setError] = useState('');
-  const busy = useRef(false);
+  const pending = useRef(new Set<string>());
   useEffect(() => {
     let cancelled = false;
     setPlugins([]);
@@ -98,42 +98,42 @@ export function PluginQuotaSection({
     [files, plugins, configuredFiles]
   );
   const refresh = useCallback(async () => {
-    if (disabled || busy.current) return;
-    busy.current = true;
+    if (disabled) return;
     const currentGeneration = captureQuotaCacheGeneration();
-    try {
-      await Promise.all(
-        targets
-          .filter(({ file }) => !file.disabled)
-          .map(async ({ plugin, file }) => {
-            const key = file.name;
-            setStates((s) => ({ ...s, [key]: { status: 'loading' } }));
-            try {
-              const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
-              if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
-              const report = plugin
-                ? await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex)
-                : await apiClient.postV8<ProviderQuotaReport>('/credentials/quota/native', {
-                    auth_index: authIndex,
-                  });
-              if (!report.groups?.length && !report.summary?.length)
-                throw new Error(t('plugin_quota.empty_report'));
-              commitIfQuotaCacheCurrent(currentGeneration, () =>
-                setStates((s) => ({ ...s, [key]: { status: 'success', report } }))
-              );
-            } catch (e: unknown) {
-              commitIfQuotaCacheCurrent(currentGeneration, () =>
-                setStates((s) => ({
-                  ...s,
-                  [key]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
-                }))
-              );
-            }
-          })
-      );
-    } finally {
-      busy.current = false;
-    }
+    await Promise.all(
+      targets
+        .filter(({ file }) => !file.disabled)
+        .map(async ({ plugin, file }) => {
+          const key = file.name;
+          const requestKey = `${currentGeneration}:${key}`;
+          if (pending.current.has(requestKey)) return;
+          pending.current.add(requestKey);
+          setStates((s) => ({ ...s, [key]: { status: 'loading' } }));
+          try {
+            const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
+            if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
+            const report = plugin
+              ? await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex)
+              : await apiClient.postV8<ProviderQuotaReport>('/credentials/quota/native', {
+                  auth_index: authIndex,
+                });
+            if (!report.groups?.length && !report.summary?.length)
+              throw new Error(t('plugin_quota.empty_report'));
+            commitIfQuotaCacheCurrent(currentGeneration, () =>
+              setStates((s) => ({ ...s, [key]: { status: 'success', report } }))
+            );
+          } catch (e: unknown) {
+            commitIfQuotaCacheCurrent(currentGeneration, () =>
+              setStates((s) => ({
+                ...s,
+                [key]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
+              }))
+            );
+          } finally {
+            pending.current.delete(requestKey);
+          }
+        })
+    );
   }, [disabled, targets, t]);
   useEffect(() => {
     void refresh();
@@ -194,7 +194,7 @@ export function PluginQuotaSection({
                         <div>
                           {bucket.window}:{' '}
                           {Number.isFinite(bucket.remainingFraction)
-                            ? `${Math.max(0, Math.min(1, bucket.remainingFraction)) * 100}%`
+                            ? `${(Math.max(0, Math.min(1, bucket.remainingFraction)) * 100).toFixed(1)}% ${translate('plugin_quota.remaining')}`
                             : '—'}
                         </div>
                         <QuotaProgressBar
