@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { apiClient } from '@/services/api/client';
 import { pluginsApi } from '@/services/api/plugins';
 import { useInterval } from '@/hooks/useInterval';
 import {
@@ -54,12 +55,14 @@ export function PluginQuotaSection({
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const generation = useQuotaStore((s) => s.cacheGeneration);
   const [plugins, setPlugins] = useState<PluginListEntry[]>([]);
+  const [configuredFiles, setConfiguredFiles] = useState<AuthFileItem[]>([]);
   const [states, setStates] = useState<Record<string, State>>({});
   const [error, setError] = useState('');
   const busy = useRef(false);
   useEffect(() => {
     let cancelled = false;
     setPlugins([]);
+    setConfiguredFiles([]);
     setStates({});
     setError('');
     pluginsApi
@@ -71,18 +74,28 @@ export function PluginQuotaSection({
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       });
+    apiClient
+      .getV8<{ files: AuthFileItem[] }>('/credentials/configured-quota')
+      .then((data) => {
+        if (!cancelled) setConfiguredFiles(data.files);
+      })
+      .catch(() => {
+        /* Older backends do not expose configured account quotas. */
+      });
     return () => {
       cancelled = true;
     };
   }, [generation]);
   const targets = useMemo(
-    () =>
-      plugins.flatMap((plugin) =>
+    () => [
+      ...plugins.flatMap((plugin) =>
         files
           .filter((file) => (file.provider || file.type) === (plugin.quotaProvider || plugin.id))
           .map((file) => ({ plugin, file }))
       ),
-    [files, plugins]
+      ...configuredFiles.map((file) => ({ plugin: undefined, file })),
+    ],
+    [files, plugins, configuredFiles]
   );
   const refresh = useCallback(async () => {
     if (disabled || busy.current) return;
@@ -98,7 +111,11 @@ export function PluginQuotaSection({
             try {
               const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
               if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
-              const report = await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex);
+              const report = plugin
+                ? await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex)
+                : await apiClient.postV8<ProviderQuotaReport>('/credentials/quota/native', {
+                    auth_index: authIndex,
+                  });
               if (!report.groups?.length && !report.summary?.length)
                 throw new Error(t('plugin_quota.empty_report'));
               commitIfQuotaCacheCurrent(currentGeneration, () =>
@@ -158,7 +175,14 @@ export function PluginQuotaSection({
                 {state.report?.summary?.map((metric) => (
                   <div className={styles.quotaRow} key={metric.key}>
                     {metric.label}:{' '}
-                    {Number.isFinite(metric.value) ? metric.value.toLocaleString() : '—'}{' '}
+                    {Number.isFinite(metric.value)
+                      ? metric.format === 'currency' && metric.currency
+                        ? new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: metric.currency,
+                          }).format(metric.value)
+                        : metric.value.toLocaleString()
+                      : '—'}{' '}
                     {metric.unit}
                   </div>
                 ))}

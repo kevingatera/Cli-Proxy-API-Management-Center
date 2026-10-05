@@ -194,6 +194,14 @@ class ApiClient {
   /**
    * GET 请求
    */
+  async getV8<T = unknown>(url: string): Promise<T> {
+    return this.get<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url);
+  }
+
+  async postV8<T = unknown>(url: string, data: unknown): Promise<T> {
+    return this.post<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url, data);
+  }
+
   async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.get<T>(url, config);
     return response.data;

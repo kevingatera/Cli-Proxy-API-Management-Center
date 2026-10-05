@@ -1066,7 +1066,7 @@
   },
   "quota_management": {
     "title": "Quota Management",
-    "description": "Monitor OAuth quota status for Antigravity, Codex, Claude, Cursor, OpenCode Zen, Kimi, and xAI credentials.",
+    "description": "Monitor provider-reported account allowances and billing windows.",
     "refresh_all_credentials": "Refresh all credentials",
     "station_keeping_label": "Station keeping",
     "station_keeping_hint": "Auto-refresh quota status to catch weekly resets.",
@@ -1621,7 +1621,7 @@
     "cycle_end": "Billing cycle ends",
     "spend": "Model usage including bonus",
     "account_unavailable": "Cursor account usage unavailable",
-    "title": "Cursor Usage",
+    "title": "Cursor Account Quota",
     "empty_title": "No Cursor Auth Files",
     "empty_desc": "Upload a Cursor credential to view usage telemetry.",
     "idle": "Not loaded. Click Refresh Button.",
@@ -1668,7 +1668,7 @@
     "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage."
   },
   "plugin_quota": {
-    "title": "Plugin account quotas",
+    "title": "Provider account quotas",
     "idle": "Click to load quota",
     "loading": "Loading quota…",
     "load_failed": "Quota unavailable: {{message}}",

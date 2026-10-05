@@ -1066,7 +1066,7 @@
   },
   "quota_management": {
     "title": "配额管理",
-    "description": "集中查看 OAuth 额度与剩余情况",
+    "description": "查看提供商报告的账户额度和计费周期。",
     "refresh_all_credentials": "刷新全部凭证",
     "station_keeping_label": "配额保活",
     "station_keeping_hint": "自动刷新配额状态以捕捉周期性重置。",
@@ -1621,7 +1621,7 @@
     "cycle_end": "账单周期结束",
     "spend": "模型用量（包含奖励）",
     "account_unavailable": "Cursor 账户用量不可用",
-    "title": "Cursor 用量",
+    "title": "Cursor 账户配额",
     "empty_title": "暂无 Cursor 认证",
     "empty_desc": "上传 Cursor 认证文件后即可查看用量遥测。",
     "idle": "尚未加载用量，请点击刷新按钮。",
@@ -1668,7 +1668,7 @@
     "telemetry_note": "当前为 OpenCode Zen/Go Key 的本地遥测视图。Zen 未开放账户额度 API，因此这里使用代理观测到的请求、失败、模型和 Token 用量。"
   },
   "plugin_quota": {
-    "title": "插件账户配额",
+    "title": "提供商账户配额",
     "idle": "点击加载配额",
     "loading": "正在加载配额…",
     "load_failed": "配额不可用：{{message}}",
