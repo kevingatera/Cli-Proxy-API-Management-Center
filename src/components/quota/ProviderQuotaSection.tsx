@@ -13,6 +13,15 @@ import {
 } from '@/stores';
 import type { AuthFileItem, PluginListEntry } from '@/types';
 import { normalizeAuthIndex } from '@/utils/authIndex';
+import { OAuthQuotaCards } from './OAuthQuotaCards';
+import {
+  ANTIGRAVITY_CONFIG,
+  CLAUDE_CONFIG,
+  CODEX_CONFIG,
+  CURSOR_CONFIG,
+  KIMI_CONFIG,
+  XAI_CONFIG,
+} from './quotaConfigs';
 import { QuotaCard } from './QuotaCard';
 import styles from '@/pages/QuotaPage.module.scss';
 
@@ -42,7 +51,7 @@ type State = {
   error?: string;
 };
 
-export function PluginQuotaSection({
+export function ProviderQuotaSection({
   files,
   disabled,
   stationKeepingEnabled,
@@ -54,6 +63,7 @@ export function PluginQuotaSection({
   const { t } = useTranslation();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const generation = useQuotaStore((s) => s.cacheGeneration);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [plugins, setPlugins] = useState<PluginListEntry[]>([]);
   const [configuredFiles, setConfiguredFiles] = useState<AuthFileItem[]>([]);
   const [states, setStates] = useState<Record<string, State>>({});
@@ -97,65 +107,115 @@ export function PluginQuotaSection({
     ],
     [files, plugins, configuredFiles]
   );
-  const refresh = useCallback(async () => {
-    if (disabled) return;
-    const currentGeneration = captureQuotaCacheGeneration();
-    await Promise.all(
-      targets
-        .filter(({ file }) => !file.disabled)
-        .map(async ({ plugin, file }) => {
-          const key = file.name;
-          const requestKey = `${currentGeneration}:${key}`;
-          if (pending.current.has(requestKey)) return;
-          pending.current.add(requestKey);
-          setStates((s) => ({ ...s, [key]: { status: 'loading' } }));
-          try {
-            const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
-            if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
-            const report = plugin
-              ? await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex)
-              : await apiClient.postV8<ProviderQuotaReport>('/credentials/quota/native', {
-                  auth_index: authIndex,
-                });
-            if (!report.groups?.length && !report.summary?.length)
-              throw new Error(t('plugin_quota.empty_report'));
-            commitIfQuotaCacheCurrent(currentGeneration, () =>
-              setStates((s) => ({ ...s, [key]: { status: 'success', report } }))
-            );
-          } catch (e: unknown) {
-            commitIfQuotaCacheCurrent(currentGeneration, () =>
-              setStates((s) => ({
-                ...s,
-                [key]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
-              }))
-            );
-          } finally {
-            pending.current.delete(requestKey);
-          }
-        })
-    );
-  }, [disabled, targets, t]);
+  const refresh = useCallback(
+    async (onlyName?: string) => {
+      if (disabled) return;
+      const currentGeneration = captureQuotaCacheGeneration();
+      await Promise.all(
+        targets
+          .filter(({ file }) => !file.disabled && (!onlyName || file.name === onlyName))
+          .map(async ({ plugin, file }) => {
+            const key = file.name;
+            const requestKey = `${currentGeneration}:${key}`;
+            if (pending.current.has(requestKey)) return;
+            pending.current.add(requestKey);
+            setStates((s) => ({ ...s, [key]: { status: 'loading' } }));
+            try {
+              const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
+              if (!authIndex) throw new Error(t('plugin_quota.missing_auth_index'));
+              const report = plugin
+                ? await pluginsApi.fetchQuota<ProviderQuotaReport>(plugin.id, authIndex)
+                : await apiClient.postV8<ProviderQuotaReport>('/credentials/quota/native', {
+                    auth_index: authIndex,
+                  });
+              if (!report.groups?.length && !report.summary?.length)
+                throw new Error(t('plugin_quota.empty_report'));
+              commitIfQuotaCacheCurrent(currentGeneration, () =>
+                setStates((s) => ({ ...s, [key]: { status: 'success', report } }))
+              );
+            } catch (e: unknown) {
+              commitIfQuotaCacheCurrent(currentGeneration, () =>
+                setStates((s) => ({
+                  ...s,
+                  [key]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
+                }))
+              );
+            } finally {
+              pending.current.delete(requestKey);
+            }
+          })
+      );
+    },
+    [disabled, targets, t]
+  );
   useEffect(() => {
     void refresh();
   }, [refresh]);
   useInterval(
     () => {
-      if (document.visibilityState === 'visible') void refresh();
+      if (document.visibilityState === 'visible') {
+        void refresh();
+        setRefreshVersion((v) => v + 1);
+      }
     },
     stationKeepingEnabled ? 300_000 : null
   );
-  if (!targets.length && !error) return null;
+  if (!targets.length && !files.length && !error) return null;
   return (
     <Card
       title={t('plugin_quota.title')}
       extra={
-        <Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={disabled}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            void refresh();
+            setRefreshVersion((v) => v + 1);
+          }}
+          disabled={disabled}
+        >
           {t('quota_management.refresh_all_credentials')}
         </Button>
       }
     >
       {error && <div className={styles.quotaError}>{error}</div>}
       <div className={styles.claudeGrid}>
+        <OAuthQuotaCards
+          config={CLAUDE_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
+        <OAuthQuotaCards
+          config={ANTIGRAVITY_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
+        <OAuthQuotaCards
+          config={CODEX_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
+        <OAuthQuotaCards
+          config={CURSOR_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
+        <OAuthQuotaCards
+          config={KIMI_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
+        <OAuthQuotaCards
+          config={XAI_CONFIG}
+          files={files}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+        />
         {targets.map(({ file }) => (
           <QuotaCard
             key={file.name}
@@ -166,9 +226,14 @@ export function PluginQuotaSection({
             defaultType={file.provider || file.type || 'plugin'}
             cardClassName=""
             canRefresh={!disabled && !file.disabled}
-            onRefresh={() => void refresh()}
+            onRefresh={() => void refresh(file.name)}
             renderQuotaItems={(state, translate, { QuotaProgressBar }) => (
               <>
+                {Array.isArray(file.connections) && file.connections.length > 1 && (
+                  <div className={styles.quotaMessage}>
+                    {translate('plugin_quota.connections')}: {file.connections.join(', ')}
+                  </div>
+                )}
                 {state.report?.subscription?.plan && (
                   <div className={styles.quotaModel}>{state.report.subscription.plan}</div>
                 )}

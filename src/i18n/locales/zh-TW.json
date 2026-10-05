@@ -1694,6 +1694,7 @@
     "telemetry_note": "當前為 OpenCode Zen/Go Key 的本地遙測視圖。Zen 未開放帳戶額度 API，因此這裡使用代理觀測到的請求、失敗、模型和 Token 用量。"
   },
   "plugin_quota": {
+    "connections": "連線",
     "remaining": "剩餘",
     "title": "供應商帳戶配額",
     "idle": "點擊載入配額",

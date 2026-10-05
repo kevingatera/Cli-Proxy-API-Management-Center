@@ -1,5 +1,5 @@
 /**
- * Quota management page - coordinates the three quota sections.
+ * Quota management page.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -8,16 +8,7 @@ import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useAuthStore, useQuotaStationKeepingStore } from '@/stores';
 import { authFilesApi } from '@/services/api';
-import {
-  QuotaSection,
-  ANTIGRAVITY_CONFIG,
-  CLAUDE_CONFIG,
-  CODEX_CONFIG,
-  CURSOR_CONFIG,
-  KIMI_CONFIG,
-  XAI_CONFIG,
-} from '@/components/quota';
-import { PluginQuotaSection } from '@/components/quota/PluginQuotaSection';
+import { ProviderQuotaSection } from '@/components/quota/ProviderQuotaSection';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
@@ -28,13 +19,11 @@ export function QuotaPage() {
   const setStationKeepingEnabled = useQuotaStationKeepingStore((state) => state.setEnabled);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const disableControls = connectionStatus !== 'connected';
 
   const loadFiles = useCallback(async () => {
-    setLoading(true);
     setError('');
     try {
       const data = await authFilesApi.list();
@@ -42,8 +31,6 @@ export function QuotaPage() {
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
-    } finally {
-      setLoading(false);
     }
   }, [t]);
 
@@ -73,51 +60,8 @@ export function QuotaPage() {
 
       {error && <div className={styles.errorBox}>{error}</div>}
 
-      <PluginQuotaSection
+      <ProviderQuotaSection
         files={files}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-
-      <QuotaSection
-        config={CLAUDE_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-      <QuotaSection
-        config={ANTIGRAVITY_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-      <QuotaSection
-        config={CODEX_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-      <QuotaSection
-        config={XAI_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-      <QuotaSection
-        config={CURSOR_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        stationKeepingEnabled={stationKeepingEnabled}
-      />
-      <QuotaSection
-        config={KIMI_CONFIG}
-        files={files}
-        loading={loading}
         disabled={disableControls}
         stationKeepingEnabled={stationKeepingEnabled}
       />
