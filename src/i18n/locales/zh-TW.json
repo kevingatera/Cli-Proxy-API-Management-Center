@@ -1613,7 +1613,7 @@
     "search_empty_desc": "請嘗試其他檔案名稱或電子郵件，或清除搜尋。",
     "search_clear": "清除搜尋",
     "title": "配額管理",
-    "description": "集中查看 OAuth 配額與剩餘情況",
+    "description": "查看供應商回報的帳戶額度和計費週期。",
     "refresh_all_credentials": "重新整理全部憑證",
     "sort_label": "排序",
     "sort_default": "預設",
@@ -2381,7 +2381,7 @@
     "expired": "綁定工作階段已過期，請重新開始。"
   },
   "cursor_quota": {
-    "title": "Cursor 用量",
+    "title": "Cursor 帳戶配額",
     "empty_title": "暫無 Cursor 認證",
     "empty_desc": "上傳 Cursor 認證檔案後即可查看用量遙測。",
     "idle": "尚未載入用量，請點擊重新整理按鈕。",

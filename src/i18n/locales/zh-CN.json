@@ -1585,7 +1585,7 @@
     "search_empty_desc": "请尝试其他文件名或邮箱，或清空搜索。",
     "search_clear": "清空搜索",
     "title": "配额管理",
-    "description": "集中查看 OAuth 额度与剩余情况",
+    "description": "查看提供商报告的账户额度和计费周期。",
     "refresh_all_credentials": "刷新全部凭证",
     "station_keeping_label": "配额保活",
     "station_keeping_hint": "自动刷新配额状态以捕捉周期性重置。",
@@ -2353,7 +2353,7 @@
     "expired": "绑定会话已过期，请重新开始。"
   },
   "cursor_quota": {
-    "title": "Cursor 用量",
+    "title": "Cursor 账户配额",
     "empty_title": "暂无 Cursor 认证",
     "empty_desc": "上传 Cursor 认证文件后即可查看用量遥测。",
     "idle": "尚未加载用量，请点击刷新按钮。",
