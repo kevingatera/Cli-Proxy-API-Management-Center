@@ -44,36 +44,6 @@ const fetchZenQuota = async (file: AuthFileItem, t: TFunction): Promise<ZenUsage
   return cloneUsageSummary(summary);
 };
 
-/** 估算的 Go 套餐限额（请求数，5 小时 / 每周 / 每月）。 */
-export const ZEN_GO_MODEL_LIMITS: Record<
-  string,
-  { label: string; fiveHour: number; weekly: number; monthly: number }
-> = {
-  'glm-5.1': { label: 'GLM-5.1', fiveHour: 880, weekly: 2150, monthly: 4300 },
-  'glm-5': { label: 'GLM-5', fiveHour: 1150, weekly: 2880, monthly: 5750 },
-  'kimi-k2.5': { label: 'Kimi K2.5', fiveHour: 1850, weekly: 4630, monthly: 9250 },
-  'kimi-k2.6': { label: 'Kimi K2.6', fiveHour: 1150, weekly: 2880, monthly: 5750 },
-  'mimo-v2-pro': { label: 'MiMo-V2-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
-  'mimo-v2-omni': { label: 'MiMo-V2-Omni', fiveHour: 2150, weekly: 5450, monthly: 10900 },
-  'mimo-v2.5-pro': { label: 'MiMo-V2.5-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
-  'mimo-v2.5': { label: 'MiMo-V2.5', fiveHour: 2150, weekly: 5450, monthly: 10900 },
-  'minimax-m2.7': { label: 'MiniMax M2.7', fiveHour: 3400, weekly: 8500, monthly: 17000 },
-  'minimax-m2.5': { label: 'MiniMax M2.5', fiveHour: 6300, weekly: 15900, monthly: 31800 },
-  'qwen3.6-plus': { label: 'Qwen3.6 Plus', fiveHour: 3300, weekly: 8200, monthly: 16300 },
-  'qwen3.5-plus': { label: 'Qwen3.5 Plus', fiveHour: 10200, weekly: 25200, monthly: 50500 },
-  'deepseek-v4-pro': { label: 'DeepSeek V4 Pro', fiveHour: 1300, weekly: 3250, monthly: 6500 },
-  'deepseek-v4-flash': { label: 'DeepSeek V4 Flash', fiveHour: 7450, weekly: 18600, monthly: 37300 },
-};
-
-export const normalizeZenGoModelId = (model: string): string => {
-  const lower = model.trim().toLowerCase();
-  const withoutPrefix = lower.startsWith('opencode-go/')
-    ? lower.slice('opencode-go/'.length)
-    : lower;
-  const parts = withoutPrefix.split('/');
-  return parts[parts.length - 1];
-};
-
 export const ZEN_CONFIG: QuotaProviderData<ZenQuotaState, ZenUsageSummary> = {
   type: 'zen',
   i18nPrefix: 'zen_quota',

@@ -32,6 +32,8 @@ import {
   isDisabledAuthFile,
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
+import { captureQuotaCacheGeneration } from '@/stores/useQuotaStore';
+import { createQuotaRequestCache } from '@/utils/quota/requestCache';
 import type { QuotaProviderData } from '../types';
 
 export type ClaudeQuotaData = {
@@ -182,7 +184,14 @@ export const resolveClaudePlanType = (profile: ClaudeProfileResponse | null): st
   return null;
 };
 
-const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
+// 429 时缓存错误 5 分钟，成功结果同样缓存 5 分钟，避免刷新风暴触发限流。
+const cachedClaudeQuota = createQuotaRequestCache<ClaudeQuotaData>();
+const fetchClaudeQuota = (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
+  const key = `${captureQuotaCacheGeneration().cacheGeneration}:${normalizeAuthIndex(file.auth_index ?? file.authIndex)}:${t('claude_quota.five_hour')}`;
+  return cachedClaudeQuota(key, () => fetchClaudeQuotaUncached(file, t));
+};
+
+const fetchClaudeQuotaUncached = async (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {

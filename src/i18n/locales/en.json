@@ -2373,7 +2373,13 @@
     "tokens_unavailable": "tokens unavailable",
     "models_value": "{{count}} models",
     "telemetry_note": "Telemetry-based view for Cursor CLI credentials (account quota API is not exposed).",
-    "fetcher_pending": "Usage telemetry is unavailable on this backend because the /usage endpoint did not respond."
+    "fetcher_pending": "Usage telemetry is unavailable on this backend because the /usage endpoint did not respond.",
+    "api_used": "Included API usage used",
+    "auto_used": "Auto usage used",
+    "total_used": "Total usage used",
+    "cycle_end": "Billing cycle ends",
+    "spend": "Model usage including bonus",
+    "account_unavailable": "Cursor account usage unavailable"
   },
   "zen_quota": {
     "title": "OpenCode Zen Usage",

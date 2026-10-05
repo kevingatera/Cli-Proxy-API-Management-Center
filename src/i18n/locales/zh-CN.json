@@ -2372,7 +2372,13 @@
     "tokens_unavailable": "暂无 Tokens 遥测",
     "models_value": "{{count}} 个模型",
     "telemetry_note": "当前为 Cursor CLI 凭证的本地遥测视图（官方未开放账户额度 API）。",
-    "fetcher_pending": "当前后端未提供用量遥测接口（/usage 无响应）。"
+    "fetcher_pending": "当前后端未提供用量遥测接口（/usage 无响应）。",
+    "api_used": "已用 API 配额",
+    "auto_used": "已用 Auto 配额",
+    "total_used": "已用总配额",
+    "cycle_end": "账单周期结束",
+    "spend": "模型用量（包含奖励）",
+    "account_unavailable": "Cursor 账户用量不可用"
   },
   "zen_quota": {
     "title": "OpenCode Zen 用量",

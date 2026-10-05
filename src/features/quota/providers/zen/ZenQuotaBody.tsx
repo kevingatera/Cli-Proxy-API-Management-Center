@@ -8,7 +8,6 @@ import { formatQuotaResetTime } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import type { QuotaBodyProps } from '../../types';
 import { emptyUsageSummary, isUsageEndpointUnavailable } from '../telemetry/usageIndex';
-import { ZEN_GO_MODEL_LIMITS, normalizeZenGoModelId } from './data';
 
 export function ZenQuotaBody({ quota, classes }: QuotaBodyProps<ZenQuotaState>) {
   const { t } = useTranslation();
@@ -67,19 +66,12 @@ export function ZenQuotaBody({ quota, classes }: QuotaBodyProps<ZenQuotaState>) 
             {t('zen_quota.model_breakdown_title')}
           </div>
           {modelBreakdown.map((model) => {
-            const limits = ZEN_GO_MODEL_LIMITS[normalizeZenGoModelId(model.model)];
-            const label = limits?.label ?? model.model;
+            const label = model.model;
             const tokenText =
               (model.tokenTelemetryCount ?? 0) > 0
                 ? t('zen_quota.tokens_value', { count: model.totalTokens })
                 : t('zen_quota.tokens_unavailable');
-            const limitText = limits
-              ? t('zen_quota.model_limits_value', {
-                  fiveHour: limits.fiveHour.toLocaleString(),
-                  weekly: limits.weekly.toLocaleString(),
-                  monthly: limits.monthly.toLocaleString(),
-                })
-              : t('zen_quota.model_limits_unknown');
+            const limitText = t('zen_quota.model_limits_unknown');
             return (
               <div
                 key={model.model}

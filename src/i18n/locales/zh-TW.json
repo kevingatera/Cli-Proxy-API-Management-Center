@@ -2400,7 +2400,13 @@
     "tokens_unavailable": "暫無 Tokens 遙測",
     "models_value": "{{count}} 個模型",
     "telemetry_note": "當前為 Cursor CLI 憑證的本地遙測視圖（官方未開放帳戶額度 API）。",
-    "fetcher_pending": "目前後端未提供用量遥測介面（/usage 無回應）。"
+    "fetcher_pending": "目前後端未提供用量遥測介面（/usage 無回應）。",
+    "api_used": "已用 API 配額",
+    "auto_used": "已用 Auto 配額",
+    "total_used": "已用總配額",
+    "cycle_end": "帳單週期結束",
+    "spend": "模型用量（包含獎勵）",
+    "account_unavailable": "Cursor 帳戶用量無法使用"
   },
   "zen_quota": {
     "title": "OpenCode Zen 用量",
