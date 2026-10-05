@@ -354,6 +354,8 @@ export interface CursorModelUsageSummary {
 }
 
 export interface CursorUsageSummary {
+  account?: import('@/utils/quota/cursorAccount').CursorAccountUsage;
+  accountError?: string;
   requests: number;
   successCount: number;
   failureCount: number;

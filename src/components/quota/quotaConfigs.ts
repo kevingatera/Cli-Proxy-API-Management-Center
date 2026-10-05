@@ -40,6 +40,9 @@ import {
   usageApi,
   type AntigravitySubscriptionSummary,
 } from '@/services/api';
+import { normalizeCursorAccountUsage } from '@/utils/quota/cursorAccount';
+import { createQuotaRequestCache } from '@/utils/quota/requestCache';
+import { captureQuotaCacheGeneration } from '@/stores';
 import { buildCandidateUsageSourceIds, normalizeUsageSourceId } from '@/utils/usage';
 import {
   ANTIGRAVITY_QUOTA_URLS,
@@ -1141,7 +1144,18 @@ const resolveClaudePlanType = (profile: ClaudeProfileResponse | null): string | 
   return null;
 };
 
-const fetchClaudeQuota = async (
+type ClaudeQuotaData = {
+  windows: ClaudeQuotaWindow[];
+  extraUsage?: ClaudeExtraUsage | null;
+  planType?: string | null;
+};
+const cachedClaudeQuota = createQuotaRequestCache<ClaudeQuotaData>();
+const fetchClaudeQuota = (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
+  const key = `${captureQuotaCacheGeneration()}:${normalizeAuthIndex(file.auth_index ?? file.authIndex)}:${t('claude_quota.five_hour')}`;
+  return cachedClaudeQuota(key, () => fetchClaudeQuotaUncached(file, t));
+};
+
+const fetchClaudeQuotaUncached = async (
   file: AuthFileItem,
   t: TFunction
 ): Promise<{
@@ -2207,35 +2221,31 @@ const loadCursorUsageIndex = async (): Promise<CursorUsageIndex> => {
   }
 };
 
-// Cursor quota card. Reads the proxy /usage endpoint and aggregates telemetry
-// by auth_index (falling back to auth file id/name matching).
 const fetchCursorQuota = async (file: AuthFileItem, t: TFunction): Promise<CursorUsageSummary> => {
-  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
-  const authIndex = normalizeAuthIndex(rawAuthIndex);
-  const authIds = [normalizeStringValue(file.id), normalizeStringValue(file.name)].filter(
-    (value): value is string => Boolean(value)
+  const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
+  if (!authIndex) throw new Error(t('cursor_quota.missing_auth_index'));
+  const headers = {
+    Authorization: 'Bearer $TOKEN$',
+    'Content-Type': 'application/json',
+    'Connect-Protocol-Version': '1',
+  };
+  const [usage, plan] = await Promise.all(
+    ['GetCurrentPeriodUsage', 'GetPlanInfo'].map((method) =>
+      apiCallApi.request({
+        authIndex,
+        method: 'POST',
+        url: `https://api2.cursor.sh/aiserver.v1.DashboardService/${method}`,
+        header: headers,
+        data: '{}',
+      })
+    )
   );
-  if (!authIndex && authIds.length === 0) {
-    throw new Error(t('cursor_quota.missing_auth_index'));
-  }
-
-  const usageIndex = await loadCursorUsageIndex();
-  let summary = emptyUsageSummary();
-
-  if (authIndex) {
-    summary = mergeCursorSummary(summary, usageIndex.byAuthIndex.get(authIndex));
-  }
-
-  if (summary.requests === 0 && authIds.length > 0) {
-    for (const authId of authIds) {
-      const byAuthIdSummary = usageIndex.byAuthId.get(authId);
-      if (!byAuthIdSummary) continue;
-      summary = mergeCursorSummary(summary, byAuthIdSummary);
-      if (summary.requests > 0) break;
-    }
-  }
-
-  return cloneCursorSummary(summary);
+  if (usage.statusCode !== 200)
+    throw createStatusError(getApiCallErrorMessage(usage), usage.statusCode);
+  return {
+    ...emptyUsageSummary(),
+    account: normalizeCursorAccountUsage(usage.body, plan.statusCode === 200 ? plan.body : null),
+  };
 };
 
 const renderCursorItems = (
@@ -2245,75 +2255,37 @@ const renderCursorItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h, Fragment } = React;
-  const summary = quota.summary ?? emptyUsageSummary();
-  const hasTelemetry = summary.requests > 0;
-  const hasTokenTelemetry = (summary.tokenTelemetryCount ?? 0) > 0;
-  const successPct = hasTelemetry ? Math.round((summary.successCount / summary.requests) * 100) : 0;
-  const lastSeenLabel = summary.lastSeenAt
-    ? formatQuotaResetTime(summary.lastSeenAt)
-    : t('cursor_quota.last_seen_never');
-  const emptyHint = cursorUsageEndpointUnavailable
-    ? t('cursor_quota.fetcher_pending')
-    : t('cursor_quota.empty_usage');
-
+  const account = quota.summary.account;
+  if (!account)
+    return h('div', { className: styleMap.quotaError }, t('cursor_quota.account_unavailable'));
   return h(
     Fragment,
     null,
-    h(
-      'div',
-      { className: styleMap.quotaRow },
-      h(
+    h('div', { className: styleMap.quotaModel }, account.plan),
+    ...(['api', 'auto', 'total'] as const).map((kind) => {
+      const used = account[`${kind}PercentUsed`];
+      return h(
         'div',
-        { className: styleMap.quotaRowHeader },
-        h('span', { className: styleMap.quotaModel }, t('cursor_quota.health_label')),
+        { className: styleMap.quotaRow, key: kind },
         h(
           'div',
-          { className: styleMap.quotaMeta },
-          h(
-            'span',
-            { className: styleMap.quotaPercent },
-            hasTelemetry ? `${successPct}%` : '--'
-          ),
-          h('span', { className: styleMap.quotaReset }, lastSeenLabel)
-        )
-      ),
-      h(
-        QuotaProgressBar,
-        { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
-      )
-    ),
-    hasTelemetry &&
-      h(
-        'div',
-        { className: styleMap.quotaMeta, style: { marginTop: '0.5rem' } },
-        h(
-          'span',
-          { className: styleMap.quotaAmount },
-          t('cursor_quota.requests_value', { count: summary.requests })
+          null,
+          t(`cursor_quota.${kind}_used`),
+          ': ',
+          used === null ? '--' : `${used.toFixed(1)}%`
         ),
-        h(
-          'span',
-          { className: styleMap.quotaAmount },
-          t('cursor_quota.failures_value', { count: summary.failureCount })
-        ),
-        h(
-          'span',
-          { className: styleMap.quotaAmount },
-          hasTokenTelemetry
-            ? t('cursor_quota.tokens_value', { count: summary.totalTokens })
-            : t('cursor_quota.tokens_unavailable')
-        ),
-        h(
-          'span',
-          { className: styleMap.quotaAmount },
-          t('cursor_quota.models_value', { count: summary.modelCount })
-        )
-      ),
-    h(
-      'div',
-      { className: styleMap.quotaMessage, style: { marginTop: '0.5rem' } },
-      hasTelemetry ? t('cursor_quota.telemetry_note') : emptyHint
-    )
+        h(QuotaProgressBar, {
+          percent: used === null ? null : 100 - used,
+          highThreshold: 70,
+          mediumThreshold: 30,
+        })
+      );
+    }),
+    account.cycleEnd &&
+      h('div', null, t('cursor_quota.cycle_end'), ': ', formatQuotaResetTime(account.cycleEnd)),
+    account.totalSpendCents !== null &&
+      h('div', null, t('cursor_quota.spend'), ': $', (account.totalSpendCents / 100).toFixed(2)),
+    account.message && h('div', { className: styleMap.quotaMessage }, account.message)
   );
 };
 
@@ -2344,35 +2316,6 @@ const fetchZenQuota = async (file: AuthFileItem, t: TFunction): Promise<ZenUsage
   });
 
   return cloneCursorSummary(summary);
-};
-
-const ZEN_GO_MODEL_LIMITS: Record<
-  string,
-  { label: string; fiveHour: number; weekly: number; monthly: number }
-> = {
-  'glm-5.1': { label: 'GLM-5.1', fiveHour: 880, weekly: 2150, monthly: 4300 },
-  'glm-5': { label: 'GLM-5', fiveHour: 1150, weekly: 2880, monthly: 5750 },
-  'kimi-k2.5': { label: 'Kimi K2.5', fiveHour: 1850, weekly: 4630, monthly: 9250 },
-  'kimi-k2.6': { label: 'Kimi K2.6', fiveHour: 1150, weekly: 2880, monthly: 5750 },
-  'mimo-v2-pro': { label: 'MiMo-V2-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
-  'mimo-v2-omni': { label: 'MiMo-V2-Omni', fiveHour: 2150, weekly: 5450, monthly: 10900 },
-  'mimo-v2.5-pro': { label: 'MiMo-V2.5-Pro', fiveHour: 1290, weekly: 3225, monthly: 6450 },
-  'mimo-v2.5': { label: 'MiMo-V2.5', fiveHour: 2150, weekly: 5450, monthly: 10900 },
-  'minimax-m2.7': { label: 'MiniMax M2.7', fiveHour: 3400, weekly: 8500, monthly: 17000 },
-  'minimax-m2.5': { label: 'MiniMax M2.5', fiveHour: 6300, weekly: 15900, monthly: 31800 },
-  'qwen3.6-plus': { label: 'Qwen3.6 Plus', fiveHour: 3300, weekly: 8200, monthly: 16300 },
-  'qwen3.5-plus': { label: 'Qwen3.5 Plus', fiveHour: 10200, weekly: 25200, monthly: 50500 },
-  'deepseek-v4-pro': { label: 'DeepSeek V4 Pro', fiveHour: 1300, weekly: 3250, monthly: 6500 },
-  'deepseek-v4-flash': { label: 'DeepSeek V4 Flash', fiveHour: 7450, weekly: 18600, monthly: 37300 },
-};
-
-const normalizeZenGoModelId = (model: string): string => {
-  const lower = model.trim().toLowerCase();
-  const withoutPrefix = lower.startsWith('opencode-go/')
-    ? lower.slice('opencode-go/'.length)
-    : lower;
-  const parts = withoutPrefix.split('/');
-  return parts[parts.length - 1];
 };
 
 const renderZenItems = (
@@ -2407,18 +2350,15 @@ const renderZenItems = (
         h(
           'div',
           { className: styleMap.quotaMeta },
-          h(
-            'span',
-            { className: styleMap.quotaPercent },
-            hasTelemetry ? `${successPct}%` : '--'
-          ),
+          h('span', { className: styleMap.quotaPercent }, hasTelemetry ? `${successPct}%` : '--'),
           h('span', { className: styleMap.quotaReset }, lastSeenLabel)
         )
       ),
-      h(
-        QuotaProgressBar,
-        { percent: hasTelemetry ? successPct : null, highThreshold: 80, mediumThreshold: 50 }
-      )
+      h(QuotaProgressBar, {
+        percent: hasTelemetry ? successPct : null,
+        highThreshold: 80,
+        mediumThreshold: 50,
+      })
     ),
     hasTelemetry &&
       h(
@@ -2462,20 +2402,12 @@ const renderZenItems = (
           t('zen_quota.model_breakdown_title')
         ),
         ...modelBreakdown.map((model) => {
-          const modelId = normalizeZenGoModelId(model.model);
-          const limits = ZEN_GO_MODEL_LIMITS[modelId];
-          const label = limits?.label ?? model.model;
+          const label = model.model;
           const tokenText =
             (model.tokenTelemetryCount ?? 0) > 0
               ? t('zen_quota.tokens_value', { count: model.totalTokens })
               : t('zen_quota.tokens_unavailable');
-          const limitText = limits
-            ? t('zen_quota.model_limits_value', {
-                fiveHour: limits.fiveHour.toLocaleString(),
-                weekly: limits.weekly.toLocaleString(),
-                monthly: limits.monthly.toLocaleString(),
-              })
-            : t('zen_quota.model_limits_unknown');
+          const limitText = t('zen_quota.model_limits_unknown');
           return h(
             'div',
             {

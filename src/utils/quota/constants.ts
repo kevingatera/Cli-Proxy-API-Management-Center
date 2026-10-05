@@ -102,6 +102,8 @@ export const CLAUDE_PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile';
 export const CLAUDE_USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 
 export const CLAUDE_REQUEST_HEADERS = {
+  'User-Agent': 'claude-code/2.1.289',
+  Accept: 'application/json',
   Authorization: 'Bearer $TOKEN$',
   'Content-Type': 'application/json',
   'anthropic-beta': 'oauth-2025-04-20',

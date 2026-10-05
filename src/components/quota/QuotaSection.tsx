@@ -98,7 +98,7 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   stationKeepingEnabled?: boolean;
 }
 
-const STATION_KEEPING_INTERVAL_MS = 60_000;
+const STATION_KEEPING_INTERVAL_MS = 300_000;
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
   config,
@@ -180,9 +180,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   // interval entirely.
   useInterval(
     () => {
-      if (stationKeepingEnabled) {
-        pendingQuotaRefreshRef.current = true;
-        void triggerHeaderRefresh();
+      if (stationKeepingEnabled && !disabled && document.visibilityState === 'visible') {
+        const targets = (effectiveViewMode === 'all' ? filteredFiles : pageItems).filter(
+          (file) => !file.disabled
+        );
+        void loadQuota(targets, setLoading);
       }
     },
     stationKeepingEnabled ? STATION_KEEPING_INTERVAL_MS : null

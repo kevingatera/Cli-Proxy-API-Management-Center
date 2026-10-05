@@ -18,6 +18,7 @@ import {
   XAI_CONFIG,
   ZEN_CONFIG,
 } from '@/components/quota';
+import { PluginQuotaSection } from '@/components/quota/PluginQuotaSection';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
@@ -72,6 +73,12 @@ export function QuotaPage() {
       </div>
 
       {error && <div className={styles.errorBox}>{error}</div>}
+
+      <PluginQuotaSection
+        files={files}
+        disabled={disableControls}
+        stationKeepingEnabled={stationKeepingEnabled}
+      />
 
       <QuotaSection
         config={CLAUDE_CONFIG}

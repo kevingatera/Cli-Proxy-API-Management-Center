@@ -1615,6 +1615,12 @@
     }
   },
   "cursor_quota": {
+    "api_used": "Included API usage used",
+    "auto_used": "Auto usage used",
+    "total_used": "Total usage used",
+    "cycle_end": "Billing cycle ends",
+    "spend": "Model usage including bonus",
+    "account_unavailable": "Cursor account usage unavailable",
     "title": "Cursor Usage",
     "empty_title": "No Cursor Auth Files",
     "empty_desc": "Upload a Cursor credential to view usage telemetry.",
@@ -1660,5 +1666,14 @@
     "model_limits_value": "5h {{fiveHour}}, week {{weekly}}, month {{monthly}}",
     "model_limits_unknown": "limits not listed",
     "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage."
+  },
+  "plugin_quota": {
+    "title": "Plugin account quotas",
+    "idle": "Click to load quota",
+    "loading": "Loading quota…",
+    "load_failed": "Quota unavailable: {{message}}",
+    "missing_auth_index": "Credential index is missing",
+    "empty_report": "Provider returned no quota data",
+    "window_end": "Window end / expiry"
   }
 }
