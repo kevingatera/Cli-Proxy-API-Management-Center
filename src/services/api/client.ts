@@ -198,6 +198,10 @@ class ApiClient {
     return this.get<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url);
   }
 
+  async patchV8<T = unknown>(url: string, data: unknown): Promise<T> {
+    return this.patch<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url, data);
+  }
+
   async postV8<T = unknown>(url: string, data: unknown): Promise<T> {
     return this.post<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url, data);
   }

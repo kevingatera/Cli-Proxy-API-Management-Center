@@ -1677,5 +1677,20 @@
     "missing_auth_index": "缺少凭据索引",
     "empty_report": "提供方未返回配额数据",
     "window_end": "窗口结束 / 到期"
+  },
+  "unified_models": {
+    "title": "模型路由",
+    "description": "每个模型使用一个统一标识，按套餐、可用配额和观测到的配额消耗选择路由。原供应商标识仍可使用。",
+    "enabled": "统一模型",
+    "bare_names": "使用无前缀名称",
+    "expose_legacy": "同时显示供应商模型标识",
+    "example": "模型标识",
+    "models": "查看 {{count}} 个模型",
+    "included": "套餐包含",
+    "metered": "按量计费",
+    "unavailable": "不可用或配额已耗尽",
+    "remaining": "剩余 {{percent}}% 配额",
+    "unknown": "配额未知或已过期",
+    "burn": "观测到 {{tokens}} token/分钟"
   }
 }

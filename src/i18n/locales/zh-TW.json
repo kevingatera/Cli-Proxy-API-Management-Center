@@ -1703,5 +1703,20 @@
     "missing_auth_index": "缺少憑證索引",
     "empty_report": "供應商未傳回配額資料",
     "window_end": "視窗結束 / 到期"
+  },
+  "unified_models": {
+    "title": "模型路由",
+    "description": "每個模型使用一個統一識別碼，按方案、可用配額和觀測到的配額消耗選擇路由。原供應商識別碼仍可使用。",
+    "enabled": "統一模型",
+    "bare_names": "使用無前綴名稱",
+    "expose_legacy": "同時顯示供應商模型識別碼",
+    "example": "模型識別碼",
+    "models": "查看 {{count}} 個模型",
+    "included": "方案包含",
+    "metered": "按量計費",
+    "unavailable": "不可用或配額已耗盡",
+    "remaining": "剩餘 {{percent}}% 配額",
+    "unknown": "配額未知或已過期",
+    "burn": "觀測到 {{tokens}} token/分鐘"
   }
 }

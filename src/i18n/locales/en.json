@@ -1677,5 +1677,20 @@
     "missing_auth_index": "Credential index is missing",
     "empty_report": "Provider returned no quota data",
     "window_end": "Window end / expiry"
+  },
+  "unified_models": {
+    "title": "Model routing",
+    "description": "One model ID, with routes ranked by plan, available allowance and observed quota depletion. Existing provider IDs remain usable.",
+    "enabled": "Unified models",
+    "bare_names": "Use bare model names",
+    "expose_legacy": "Show provider model IDs too",
+    "example": "Model ID",
+    "models": "Inspect {{count}} models",
+    "included": "Included plan",
+    "metered": "Metered plan",
+    "unavailable": "Unavailable or exhausted",
+    "remaining": "{{percent}}% allowance remaining",
+    "unknown": "Quota unknown or stale",
+    "burn": "{{tokens}} tokens/min observed"
   }
 }
