@@ -2405,5 +2405,20 @@
     "model_limits_unknown": "limits not listed",
     "telemetry_note": "Telemetry-based view for OpenCode Zen/Go keys. Zen does not expose an account quota API, so this uses proxy-observed requests, failures, models, and token usage.",
     "fetcher_pending": "Usage telemetry is unavailable on this backend because the /usage endpoint did not respond."
+  },
+  "unified_models": {
+    "title": "Model routing",
+    "description": "One model ID, with routes ranked by plan, available allowance and observed quota depletion. Existing provider IDs remain usable.",
+    "enabled": "Unified models",
+    "bare_names": "Use bare model names",
+    "expose_legacy": "Show provider model IDs too",
+    "example": "Model ID",
+    "models": "Inspect {{count}} models",
+    "included": "Included plan",
+    "metered": "Metered plan",
+    "unavailable": "Unavailable or exhausted",
+    "remaining": "{{percent}}% allowance remaining",
+    "unknown": "Quota unknown or stale",
+    "burn": "{{tokens}} tokens/min observed"
   }
 }

@@ -31,6 +31,7 @@ import {
 } from './uiState';
 import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
 import styles from './ProvidersWorkbenchPage.module.scss';
+import { UnifiedModelsCard } from './components/UnifiedModelsCard';
 
 type SheetMode = 'detail' | 'create' | 'edit';
 
@@ -400,6 +401,8 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
           showNewAction={!fixedBrand}
           showSummary={fixedBrand !== 'apikeyFun'}
         />
+        {!fixedBrand && <UnifiedModelsCard disabled={disableMutations} />}
+
         {errorBanner}
       </div>
     );

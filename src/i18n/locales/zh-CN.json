@@ -2404,5 +2404,20 @@
     "model_limits_unknown": "暂无限额参考",
     "telemetry_note": "当前为 OpenCode Zen/Go Key 的本地遥测视图。Zen 未开放账户额度 API，因此这里使用代理观测到的请求、失败、模型和 Token 用量。",
     "fetcher_pending": "当前后端未提供用量遥测接口（/usage 无响应）。"
+  },
+  "unified_models": {
+    "title": "模型路由",
+    "description": "每个模型使用一个统一标识，按套餐、可用配额和观测到的配额消耗选择路由。原供应商标识仍可使用。",
+    "enabled": "统一模型",
+    "bare_names": "使用无前缀名称",
+    "expose_legacy": "同时显示供应商模型标识",
+    "example": "模型标识",
+    "models": "查看 {{count}} 个模型",
+    "included": "套餐包含",
+    "metered": "按量计费",
+    "unavailable": "不可用或配额已耗尽",
+    "remaining": "剩余 {{percent}}% 配额",
+    "unknown": "配额未知或已过期",
+    "burn": "观测到 {{tokens}} token/分钟"
   }
 }

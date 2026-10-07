@@ -1,0 +1,32 @@
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0;
+}
+.example {
+  color: var(--text-secondary);
+}
+.models {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.model {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+.route {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  code {
+    flex-basis: 100%;
+  }
+}

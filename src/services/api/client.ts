@@ -245,6 +245,19 @@ class ApiClient {
   /**
    * Get the raw response (for downloads, etc.)
    */
+  // v8 management routes (routing/unified-models etc.) live beside the v0 surface.
+  async getV8<T = unknown>(url: string): Promise<T> {
+    return this.get<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url);
+  }
+
+  async postV8<T = unknown>(url: string, data: unknown): Promise<T> {
+    return this.post<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url, data);
+  }
+
+  async patchV8<T = unknown>(url: string, data: unknown): Promise<T> {
+    return this.patch<T>(this.apiBase.replace(/\/v0\/management$/, '/v8/management') + url, data);
+  }
+
   async getRaw(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse> {
     return this.instance.get(url, config);
   }
