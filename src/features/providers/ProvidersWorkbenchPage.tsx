@@ -372,7 +372,7 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     closeSheet();
   }, [closeSheet, showNotification, t]);
 
-  // 加载状态
+  // Loading state.
   if (!workbench.snapshot && workbench.isPending) {
     return (
       <div className={styles.page}>
@@ -425,6 +425,8 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
         onRefresh={() => void handleRefresh()}
         onNew={openCreate}
       />
+
+      {!fixedBrand && <UnifiedModelsCard disabled={disableMutations} />}
 
       {errorBanner}
 
