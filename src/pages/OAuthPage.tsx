@@ -22,6 +22,7 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
+import iconMeta from '@/assets/icons/meta.svg';
 
 interface ProviderState {
   url?: string;
@@ -73,6 +74,12 @@ function getErrorStatus(error: unknown): number | undefined {
 }
 
 const PROVIDERS: BuiltInOAuthProviderCard[] = [
+  {
+    kind: 'builtin',
+    id: 'meta',
+    titleKey: 'auth_login.meta_oauth_title',
+    icon: iconMeta,
+  },
   {
     kind: 'builtin',
     id: 'kimi',

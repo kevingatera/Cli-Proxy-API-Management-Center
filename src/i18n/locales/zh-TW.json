@@ -690,7 +690,18 @@
     "iflow_cookie_result_expired": "到期時間",
     "iflow_cookie_result_path": "儲存路徑",
     "iflow_cookie_result_type": "類型",
-    "remote_access_disabled": "遠端存取不支援此登入方式，請從本地（localhost）存取"
+    "remote_access_disabled": "遠端存取不支援此登入方式，請從本地（localhost）存取",
+    "meta_oauth_title": "Meta Muse OAuth",
+    "meta_oauth_button": "使用 Meta Muse 登入",
+    "meta_oauth_hint": "登入 Meta 帳戶以連接 Muse Code。訂閱用量需要有效的 Muse Code 方案；一般 API 金鑰另外計費。",
+    "meta_oauth_url_label": "授權連結:",
+    "meta_open_link": "開啟連結",
+    "meta_copy_link": "複製連結",
+    "meta_oauth_status_waiting": "等待驗證中...",
+    "meta_oauth_status_success": "驗證成功！",
+    "meta_oauth_status_error": "驗證失敗:",
+    "meta_oauth_start_error": "啟動 Meta Muse OAuth 失敗:",
+    "meta_oauth_polling_error": "檢查驗證狀態失敗:"
   },
   "stats": {
     "success": "成功",

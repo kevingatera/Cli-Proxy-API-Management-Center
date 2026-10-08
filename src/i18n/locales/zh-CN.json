@@ -664,7 +664,18 @@
     "iflow_oauth_status_error": "认证失败:",
     "iflow_oauth_start_error": "启动 iFlow OAuth 失败:",
     "iflow_oauth_polling_error": "检查认证状态失败:",
-    "remote_access_disabled": "远程访问不支持此登录方式，请从本地 (localhost) 访问"
+    "remote_access_disabled": "远程访问不支持此登录方式，请从本地 (localhost) 访问",
+    "meta_oauth_title": "Meta Muse OAuth",
+    "meta_oauth_button": "使用 Meta Muse 登录",
+    "meta_oauth_hint": "登录 Meta 账户以连接 Muse Code。订阅用量需要有效的 Muse Code 套餐；普通 API 密钥单独计费。",
+    "meta_oauth_url_label": "授权链接:",
+    "meta_open_link": "打开链接",
+    "meta_copy_link": "复制链接",
+    "meta_oauth_status_waiting": "等待认证中...",
+    "meta_oauth_status_success": "认证成功！",
+    "meta_oauth_status_error": "认证失败:",
+    "meta_oauth_start_error": "启动 Meta Muse OAuth 失败:",
+    "meta_oauth_polling_error": "检查认证状态失败:"
   },
   "stats": {
     "success": "成功",

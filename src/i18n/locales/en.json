@@ -664,7 +664,18 @@
     "iflow_oauth_status_error": "Authentication failed:",
     "iflow_oauth_start_error": "Failed to start iFlow OAuth:",
     "iflow_oauth_polling_error": "Failed to check authentication status:",
-    "remote_access_disabled": "This login method is not available for remote access. Please access from localhost."
+    "remote_access_disabled": "This login method is not available for remote access. Please access from localhost.",
+    "meta_oauth_title": "Meta Muse OAuth",
+    "meta_oauth_button": "Log in with Meta Muse",
+    "meta_oauth_hint": "Sign in with your Meta account to connect Muse Code. Subscription usage requires an active Muse Code plan; ordinary API keys use separate billing.",
+    "meta_oauth_url_label": "Authorization URL:",
+    "meta_open_link": "Open Link",
+    "meta_copy_link": "Copy Link",
+    "meta_oauth_status_waiting": "Waiting for authentication...",
+    "meta_oauth_status_success": "Authentication successful!",
+    "meta_oauth_status_error": "Authentication failed:",
+    "meta_oauth_start_error": "Failed to start Meta Muse OAuth:",
+    "meta_oauth_polling_error": "Failed to check authentication status:"
   },
   "stats": {
     "success": "Success",
