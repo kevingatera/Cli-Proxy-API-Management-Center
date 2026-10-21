@@ -28,6 +28,13 @@ import type { ClaudeQuotaState } from '@/types';
 import fixture from './fixtures/claude-oauth-usage.json';
 
 const translations = i18n.cloneInstance({ lng: 'en' });
+
+// Every read should reach upstream. Bumping the quota generation keeps the Claude 429
+// backoff from one scenario answering the next, without touching stored last-good values.
+const fetchFresh = () => {
+  useQuotaStore.setState((state) => ({ cacheGeneration: state.cacheGeneration + 1 }));
+  return CLAUDE_CONFIG.fetchQuota(file, translations.t);
+};
 const observedAt = '2026-10-10T00:00:00Z';
 const file = { name: 'claude-fixture.json', type: 'claude', authIndex: 'synthetic-index' };
 const classes = bindQuotaClasses(
@@ -192,7 +199,7 @@ describe('Claude quota usage reads', () => {
         ? result(200, fixture)
         : result(200, { account: { has_claude_max: true } });
     };
-    const data = await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+    const data = await fetchFresh();
     expect(requests.map((request) => request.url)).toEqual([CLAUDE_USAGE_URL, CLAUDE_PROFILE_URL]);
     expect(requests[0]).toMatchObject({
       method: 'GET',
@@ -222,7 +229,7 @@ describe('Claude quota usage reads', () => {
     apiCallApi.request = async (request) =>
       request.url === CLAUDE_USAGE_URL ? result(200, fixture) : result(200, null);
     const state = CLAUDE_CONFIG.buildSuccessState(
-      await CLAUDE_CONFIG.fetchQuota(file, translations.t)
+      await fetchFresh()
     );
     expect(state.windows.map((window) => window.id)).not.toContain('cloud-session-credits');
     expect(nextRecoveryMs('claude', state, Date.parse('2026-10-31T00:00:00Z'))).toBe(
@@ -237,7 +244,7 @@ describe('Claude quota usage reads', () => {
           ? result(status, fixture)
           : result(200, { account: { has_claude_max: true } });
       try {
-        await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+        await fetchFresh();
         throw new Error('A failed read must not reach the success notification path');
       } catch (error) {
         expect(getStatusFromError(error)).toBe(status);
@@ -247,7 +254,7 @@ describe('Claude quota usage reads', () => {
 
   test('does not fabricate a snapshot when a read fails without cached data', async () => {
     apiCallApi.request = async () => result(401, { error: 'usage unavailable' });
-    await expect(CLAUDE_CONFIG.fetchQuota(file, translations.t)).rejects.toThrow(
+    await expect(fetchFresh()).rejects.toThrow(
       '401 usage unavailable'
     );
   });
@@ -261,7 +268,7 @@ describe('Claude quota usage reads', () => {
         request.url === CLAUDE_USAGE_URL
           ? result(200, { iguana_necktie: window })
           : result(503, null);
-      const data = await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+      const data = await fetchFresh();
       expect(data.windows).toHaveLength(1);
       expect(data.windows[0].id).toBe(
         'remaining_dollars' in window ? 'cloud-session-credits' : 'seven-day-fable'
@@ -273,7 +280,7 @@ describe('Claude quota usage reads', () => {
   test('rejects malformed successful responses rather than erasing the last-good values', async () => {
     for (const body of [null, '', 'not-json', [], { error: 'no usage' }]) {
       apiCallApi.request = async () => result(200, body);
-      await expect(CLAUDE_CONFIG.fetchQuota(file, translations.t)).rejects.toThrow(
+      await expect(fetchFresh()).rejects.toThrow(
         translations.t('claude_quota.empty_windows')
       );
     }
@@ -305,7 +312,7 @@ describe('Claude quota usage reads', () => {
       store.clearQuotaCache();
       try {
         const good = CLAUDE_CONFIG.buildSuccessState(
-          await CLAUDE_CONFIG.fetchQuota(file, translations.t)
+          await fetchFresh()
         );
         store.setClaudeQuota({ [key]: good });
         failing = true;
@@ -313,7 +320,7 @@ describe('Claude quota usage reads', () => {
         expect(useQuotaStore.getState().claudeQuota[key].windows).toBe(good.windows);
         let failureHandled = false;
         try {
-          await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+          await fetchFresh();
         } catch (error) {
           failureHandled = true;
           store.setClaudeQuota({
@@ -334,7 +341,7 @@ describe('Claude quota usage reads', () => {
         expect(retained.dollarWindows).toBe(good.dollarWindows);
         failing = false;
         const recovered = CLAUDE_CONFIG.buildSuccessState(
-          await CLAUDE_CONFIG.fetchQuota(file, translations.t)
+          await fetchFresh()
         );
         store.setClaudeQuota({ [key]: recovered });
         expect(useQuotaStore.getState().claudeQuota[key]).toBe(recovered);
@@ -361,7 +368,7 @@ describe('Claude quota usage reads', () => {
     store.clearQuotaCache();
     try {
       expect(CLAUDE_CONFIG.storeSelector(useQuotaStore.getState())[file.name]).toBeUndefined();
-      const data = await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+      const data = await fetchFresh();
       const state = CLAUDE_CONFIG.buildSuccessState(data);
       store.setClaudeQuota({ [getQuotaCacheKey(file)]: state });
       const stored = CLAUDE_CONFIG.storeSelector(useQuotaStore.getState())[file.name];

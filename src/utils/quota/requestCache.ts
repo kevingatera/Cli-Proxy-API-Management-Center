@@ -1,4 +1,4 @@
-export function createQuotaRequestCache<T>(now: () => number = Date.now) {
+export function createQuotaRequestCache<T>(now: () => number = Date.now, successTtlMs = 300_000) {
   const cache = new Map<string, { until: number; value?: T; error?: unknown }>();
   const pending = new Map<string, Promise<T>>();
   return (key: string, fetch: () => Promise<T>): Promise<T> => {
@@ -11,7 +11,7 @@ export function createQuotaRequestCache<T>(now: () => number = Date.now) {
     for (const [id, entry] of cache) if (entry.until <= now()) cache.delete(id);
     const request = fetch()
       .then((value) => {
-        cache.set(key, { until: now() + 300_000, value });
+        if (successTtlMs > 0) cache.set(key, { until: now() + successTtlMs, value });
         return value;
       })
       .catch((error: unknown) => {

@@ -184,8 +184,8 @@ export const resolveClaudePlanType = (profile: ClaudeProfileResponse | null): st
   return null;
 };
 
-// 429 时缓存错误 5 分钟，成功结果同样缓存 5 分钟，避免刷新风暴触发限流。
-const cachedClaudeQuota = createQuotaRequestCache<ClaudeQuotaData>();
+// 仅缓存 429 退避（5 分钟）；成功读取不缓存，保证手动刷新与上游测试语义一致。
+const cachedClaudeQuota = createQuotaRequestCache<ClaudeQuotaData>(Date.now, 0);
 const fetchClaudeQuota = (file: AuthFileItem, t: TFunction): Promise<ClaudeQuotaData> => {
   const key = `${captureQuotaCacheGeneration().cacheGeneration}:${normalizeAuthIndex(file.auth_index ?? file.authIndex)}:${t('claude_quota.five_hour')}`;
   return cachedClaudeQuota(key, () => fetchClaudeQuotaUncached(file, t));
