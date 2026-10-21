@@ -10,6 +10,8 @@ export function resolveAuthProvider(file: AuthFileItem): string {
   if (key === 'x-ai' || key === 'grok') return 'xai';
   // Kimi International (kimi.ai) accounts share Kimi's quota API on another host.
   if (key === 'kimi-ai') return 'kimi';
+  // OpenCode Go keys are OpenCode Zen keys; older auth files use the Go name.
+  if (key === 'opencode-go') return 'zen';
   return key;
 }
 
@@ -42,7 +44,7 @@ export function isCursorFile(file: AuthFileItem): boolean {
 }
 
 export function isZenFile(file: AuthFileItem): boolean {
-  return resolveAuthProvider(file) === 'opencode-go' || resolveAuthProvider(file) === 'zen';
+  return resolveAuthProvider(file) === 'zen';
 }
 
 /** Providers rendered by a dedicated built-in quota card. */
@@ -54,7 +56,6 @@ export const BUILT_IN_QUOTA_PROVIDERS: ReadonlySet<string> = new Set([
   'devin',
   'kimi',
   'meta',
-  'opencode-go',
   'xai',
   'zen',
 ]);
