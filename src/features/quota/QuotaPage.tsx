@@ -62,8 +62,8 @@ import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
-// 站点保活：开启时每 60 秒重拉文件列表与当前页额度，页面隐藏时暂停。
-const STATION_KEEPING_INTERVAL_MS = 60_000;
+// 站点保活：开启时每 5 分钟重拉当前页额度，页面隐藏时暂停。
+const STATION_KEEPING_INTERVAL_MS = 300_000;
 
 /**
  * Existing providers display filenames; Devin's card and timeline share an
@@ -310,12 +310,13 @@ export function QuotaPage() {
     loadQuota
   );
 
-  // Station keeping runs the same path as the header refresh-all button, so the
-  // interval reloads quota telemetry rather than only the file list.
+  // Station keeping reloads the visible page's quotas; it pauses while the tab is hidden.
   useInterval(
     () => {
-      if (document.visibilityState !== 'visible' || loading || batchLoading) return;
-      handleRefreshAll();
+      if (document.visibilityState !== 'visible' || disableControls || loading || batchLoading) {
+        return;
+      }
+      void loadQuota(pageItems);
     },
     stationKeepingEnabled ? STATION_KEEPING_INTERVAL_MS : null
   );
