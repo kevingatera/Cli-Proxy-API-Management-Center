@@ -38,6 +38,8 @@ export const formatResetHintFromMessage = (message: string): string | null => {
     const epoch = findResetEpoch(candidate);
     if (epoch === null) continue;
     const seconds = epoch > MS_THRESHOLD ? epoch / 1000 : epoch;
+    // Outside 2000..2100 the value is not a reset time; show nothing rather than a bogus date.
+    if (seconds < 946684800 || seconds > 4102444800) return null;
     const formatted = formatUnixSeconds(seconds);
     return formatted === '-' ? null : formatted;
   }
