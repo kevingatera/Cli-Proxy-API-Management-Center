@@ -11,17 +11,6 @@ export interface CodexResetCreditsSummary {
   invalidPayload: boolean;
 }
 
-const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hour12: false,
-});
-
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -104,8 +93,20 @@ export const normalizeCodexResetCreditsPayload = (payload: unknown): CodexResetC
   };
 };
 
-export const formatShanghaiDateTime = (value: string): string => {
+export const formatLocalDateTime = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return SHANGHAI_TIME_FORMATTER.format(date).replace(',', '');
+  // Built per call so the viewer's current zone is always read.
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  })
+    .format(date)
+    .replace(',', '');
 };

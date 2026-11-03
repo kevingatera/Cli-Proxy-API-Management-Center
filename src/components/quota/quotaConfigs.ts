@@ -85,7 +85,7 @@ import {
   buildXaiPaidHealthSummary,
   mergeXaiBillingSummaries,
   createStatusError,
-  formatShanghaiDateTime,
+  formatLocalDateTime,
   getStatusFromError,
   isAntigravityFile,
   isClaudeFile,
@@ -1005,7 +1005,7 @@ const renderCodexItems = (
             h(
               'span',
               { className: styleMap.codexResetCreditTime },
-              formatShanghaiDateTime(credit.expiresAt) || credit.expiresAt
+              formatLocalDateTime(credit.expiresAt) || credit.expiresAt
             )
           )
         )
