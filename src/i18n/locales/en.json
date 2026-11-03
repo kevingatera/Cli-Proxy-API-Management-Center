@@ -177,6 +177,7 @@
     "health_status_healthy": "Healthy",
     "health_status_warning": "Warning",
     "health_status_disabled": "Disabled",
+    "reset_at": "Resets at: {{time}}",
     "download_button": "Download",
     "delete_button": "Delete",
     "delete_confirm": "Are you sure you want to delete file",

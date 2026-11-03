@@ -177,6 +177,7 @@
     "health_status_healthy": "健康",
     "health_status_warning": "警告",
     "health_status_disabled": "已停用",
+    "reset_at": "重置時間：{{time}}",
     "download_button": "下載",
     "delete_button": "刪除",
     "delete_confirm": "確定要刪除檔案",

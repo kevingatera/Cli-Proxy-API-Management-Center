@@ -20,6 +20,7 @@ import {
   statusBarDataFromRecentRequests,
 } from '@/utils/recentRequests';
 import { formatFileSize } from '@/utils/format';
+import { formatResetHintFromMessage } from '@/utils/quota/resetHint';
 import {
   QUOTA_PROVIDER_TYPES,
   formatModified,
@@ -126,6 +127,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const rawStatusMessage = getAuthFileStatusMessage(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
+  const resetHint = hasStatusWarning ? formatResetHintFromMessage(rawStatusMessage) : null;
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
@@ -237,7 +239,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
           {rawStatusMessage && hasStatusWarning && (
             <div className={styles.healthStatusMessage} title={rawStatusMessage}>
               <IconInfo className={styles.messageIcon} size={14} />
-              <span>{rawStatusMessage}</span>
+              <div>
+                <span>{rawStatusMessage}</span>
+                {resetHint && (
+                  <div className={styles.healthStatusHint}>
+                    {t('auth_files.reset_at', { time: resetHint })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

@@ -176,6 +176,7 @@
     "health_status_healthy": "Нормально",
     "health_status_warning": "Предупреждение",
     "health_status_disabled": "Отключено",
+    "reset_at": "Сброс: {{time}}",
     "download_button": "Скачать",
     "delete_button": "Удалить",
     "delete_confirm": "Удалить файл",

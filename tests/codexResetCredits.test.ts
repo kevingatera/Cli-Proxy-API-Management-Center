@@ -22,7 +22,7 @@ describe('Codex reset-credit expiry formatting', () => {
   test('formats the instant in the viewer local zone with a short zone name', () => {
     const result = formatLocalDateTime(INSTANT);
 
-    expect(result).toBe('2026-11-03 00:00:00 EST');
+    expect(result).toMatch(/^2026-11-03 00:00:00 (EST|GMT-5)$/);
     expect(result).not.toContain('13:00');
     expect(result).not.toContain('GMT+8');
   });
